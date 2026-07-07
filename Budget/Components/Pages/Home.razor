@@ -1,7 +1,37 @@
-﻿@page "/"
+@page "/"
+@using Budget.Models
+@using Budget.Repositories
+@inject ITransactionRepository TransactionRepository
 
 <PageTitle>Home</PageTitle>
 
-<h1>Hello, world!</h1>
+<table>
+    <thead>
+        <tr>
+            <th>Date</th>
+            <th>Amount</th>
+            <th>Creditor</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var t in transactions)
+        {
+            <tr>
+                <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
+                <td>@t.TransactionAmount.Value @t.TransactionAmount.Currency</td>
+                <td>@t.Creditor?.Name</td>
+            </tr>
+        }
+    </tbody>
+</table>
 
-Welcome to your new app.
+@code {
+    private List<TransactionDocument> transactions = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        transactions = (await TransactionRepository.Get())
+            .OrderByDescending(t => t.BookingDate)
+            .ToList();
+    }
+}
