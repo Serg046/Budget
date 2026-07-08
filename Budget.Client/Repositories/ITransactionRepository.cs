@@ -1,6 +1,6 @@
-using Budget.Models;
+using Budget.Client.Models;
 
-namespace Budget.Repositories;
+namespace Budget.Client.Repositories;
 
 public interface ITransactionRepository
 {

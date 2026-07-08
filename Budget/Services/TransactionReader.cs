@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Budget.Models;
+using Budget.Client.Models;
 
 namespace Budget.Services;
 

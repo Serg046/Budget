@@ -2,11 +2,12 @@ using System.Text.Json.Serialization;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace Budget.Models;
+namespace Budget.Client.Models;
 
 public class TransactionDocument
 {
     [BsonId]
+    [JsonIgnore]
     public ObjectId Id { get; set; }
 
     [BsonElement("transactionId")]

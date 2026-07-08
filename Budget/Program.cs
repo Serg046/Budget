@@ -2,13 +2,16 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Budget.Client.Repositories;
 using Budget.Components;
 using Budget.Repositories;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents()
+    .AddInteractiveWebAssemblyComponents();
 builder.Services.AddSingleton<IMongoClient>(_ =>
     new MongoClient(builder.Configuration["MongoDb:ConnectionString"]));
 builder.Services.AddSingleton(sp =>
@@ -24,7 +27,11 @@ var privateKeyPath = app.Configuration["EnableBanking:PrivateKeyPath"]!;
 var rsa = LoadPrivateKey(privateKeyPath);
 SetAuthHeader();
 
-if (!app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
+{
+    app.UseWebAssemblyDebugging();
+}
+else
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
 }
@@ -33,9 +40,14 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 
 app.UseAntiforgery();
 
+app.MapGet("/api/transactions", async (DateOnly from, DateOnly to, ITransactionRepository repo) =>
+    await repo.Get(from, to));
+
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddInteractiveWebAssemblyRenderMode()
+    .AddAdditionalAssemblies(typeof(Budget.Client._Imports).Assembly);
 
 app.Run();
 

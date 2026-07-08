@@ -1,4 +1,5 @@
-using Budget.Models;
+using Budget.Client.Models;
+using Budget.Client.Repositories;
 using MongoDB.Driver;
 
 namespace Budget.Repositories;
