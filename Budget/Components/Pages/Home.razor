@@ -1,9 +1,16 @@
 @page "/"
+@rendermode InteractiveServer
 @using Budget.Models
 @using Budget.Repositories
 @inject ITransactionRepository TransactionRepository
 
 <PageTitle>Home</PageTitle>
+
+<div class="month-picker">
+    <button class="month-picker__nav" @onclick="PreviousMonth" aria-label="Previous month">&#8249;</button>
+    <span class="month-picker__label">@_month.ToString("MMMM yyyy")</span>
+    <button class="month-picker__nav" @onclick="NextMonth" aria-label="Next month">&#8250;</button>
+</div>
 
 <table>
     <thead>
@@ -14,7 +21,7 @@
         </tr>
     </thead>
     <tbody>
-        @foreach (var t in transactions)
+        @foreach (var t in _transactions)
         {
             <tr>
                 <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
@@ -26,12 +33,29 @@
 </table>
 
 @code {
-    private List<TransactionDocument> transactions = [];
+    private DateOnly _month = new(DateTime.Today.Year, DateTime.Today.Month, 1);
+    private List<TransactionDocument> _transactions = [];
 
     protected override async Task OnInitializedAsync()
     {
-        transactions = (await TransactionRepository.Get())
-            .OrderByDescending(t => t.BookingDate)
-            .ToList();
+        await LoadTransactions();
+    }
+
+    private async Task PreviousMonth()
+    {
+        _month = _month.AddMonths(-1);
+        await LoadTransactions();
+    }
+
+    private async Task NextMonth()
+    {
+        _month = _month.AddMonths(1);
+        await LoadTransactions();
+    }
+
+    private async Task LoadTransactions()
+    {
+        var to = _month.AddMonths(1).AddDays(-1);
+        _transactions = await TransactionRepository.Get(_month, to);
     }
 }

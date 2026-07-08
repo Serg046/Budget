@@ -6,5 +6,5 @@ public interface ITransactionRepository
 {
     Task Save(IEnumerable<TransactionDocument> transactions);
 
-    Task<List<TransactionDocument>> Get();
+    Task<List<TransactionDocument>> Get(DateOnly from, DateOnly to);
 }
