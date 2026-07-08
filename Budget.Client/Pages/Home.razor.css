@@ -78,5 +78,77 @@
 
 table th,
 table td {
-    padding: 0.25rem 1rem;
+    padding: 0.4rem 1rem;
+}
+
+table tbody tr {
+    cursor: pointer;
+}
+
+table tbody tr:hover {
+    background-color: #f3eaf7;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: min(40rem, 90vw);
+    max-height: 80vh;
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.3);
+}
+
+.modal-box__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    color: #3a0647;
+}
+
+.modal-box__close {
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #3a0647;
+}
+
+.modal-box__json {
+    margin: 0;
+    overflow: auto;
+    background: #f7f7f7;
+    border: 1px solid #d6d5d5;
+    border-radius: 0.25rem;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.modal-box__copy {
+    align-self: flex-end;
+    border: 1px solid #3a0647;
+    background: #fff;
+    color: #3a0647;
+    border-radius: 0.25rem;
+    padding: 0.4rem 1rem;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.modal-box__copy:hover {
+    background-color: #f3eaf7;
 }

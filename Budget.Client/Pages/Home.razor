@@ -1,8 +1,10 @@
 @page "/"
 @rendermode InteractiveAuto
+@using System.Text.Json
 @using Budget.Client.Models
 @using Budget.Client.Repositories
 @inject ITransactionRepository TransactionRepository
+@inject IJSRuntime JS
 
 <PageTitle>Home</PageTitle>
 
@@ -28,7 +30,7 @@
     <tbody>
         @foreach (var t in Transactions ?? [])
         {
-            <tr>
+            <tr @onclick="() => ShowDetails(t)">
                 <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
                 <td>@t.TransactionAmount.Value @t.TransactionAmount.Currency</td>
                 <td>@t.Creditor?.Name</td>
@@ -37,12 +39,30 @@
     </tbody>
 </table>
 
+@if (SelectedTransactionJson is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseDetails">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-box__header">
+                <span>Transaction</span>
+                <button class="modal-box__close" @onclick="CloseDetails" aria-label="Close">&times;</button>
+            </div>
+            <pre class="modal-box__json">@SelectedTransactionJson</pre>
+            <button class="modal-box__copy" @onclick="CopyToClipboard">Copy</button>
+        </div>
+    </div>
+}
+
 @code {
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
     [PersistentState]
     public DateOnly Month { get; set; }
 
     [PersistentState]
     public List<TransactionDocument>? Transactions { get; set; }
+
+    private string? SelectedTransactionJson { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
@@ -71,5 +91,23 @@
     {
         var to = Month.AddMonths(1).AddDays(-1);
         Transactions = await TransactionRepository.Get(Month, to);
+    }
+
+    private void ShowDetails(TransactionDocument transaction)
+    {
+        SelectedTransactionJson = JsonSerializer.Serialize(transaction, JsonOptions);
+    }
+
+    private void CloseDetails()
+    {
+        SelectedTransactionJson = null;
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (SelectedTransactionJson is not null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", SelectedTransactionJson);
+        }
     }
 }
