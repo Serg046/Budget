@@ -1,11 +1,18 @@
 .sync-status {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
     margin-top: auto;
     padding: 1rem;
     color: rgba(255, 255, 255, 0.7);
+}
+
+.sync-status__row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
 }
 
 .sync-status__button {
@@ -38,6 +45,10 @@
 
 .sync-status__text {
     font-size: 0.85rem;
+}
+
+.sync-status__username {
+    font-size: 1rem;
 }
 
 @keyframes sync-status-spin {

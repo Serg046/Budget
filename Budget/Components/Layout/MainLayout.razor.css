@@ -23,6 +23,16 @@ main {
     align-items: center;
 }
 
+    .top-row ::deep a {
+        white-space: nowrap;
+        margin-left: 1.5rem;
+        text-decoration: none;
+    }
+
+    .top-row ::deep a:hover {
+        text-decoration: underline;
+    }
+
 article {
     display: flex;
     flex-direction: column;

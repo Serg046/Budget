@@ -1,0 +1,31 @@
+@page "/login"
+@layout Budget.Components.Layout.LoginLayout
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components
+@attribute [AllowAnonymous]
+
+<PageTitle>Log in</PageTitle>
+
+<div class="login-card">
+    <h1 class="login-card__title">Budget</h1>
+    <form class="login-card__form" method="post" action="/api/auth/login">
+        <label class="login-card__label">
+            Username
+            <input class="login-card__input" type="text" name="username" autocomplete="username" required/>
+        </label>
+        <label class="login-card__label">
+            Password
+            <input class="login-card__input" type="password" name="password" autocomplete="current-password" required/>
+        </label>
+        @if (Error == "1")
+        {
+            <p class="login-card__error">Invalid username or password.</p>
+        }
+        <button class="login-card__submit" type="submit">Log in</button>
+    </form>
+</div>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? Error { get; set; }
+}

@@ -4,6 +4,11 @@ namespace Budget.Client.Repositories;
 
 public class SyncStatusApiClient(HttpClient http) : ISyncStatusRepository
 {
+    public async Task<string?> GetUsername()
+    {
+        return await http.GetFromJsonAsync<string?>("api/sync-status/username");
+    }
+
     public async Task<DateTime?> GetLastDataUpdate()
     {
         return await http.GetFromJsonAsync<DateTime?>("api/sync-status/last-data-update");

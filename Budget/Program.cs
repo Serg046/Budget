@@ -1,8 +1,15 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Budget.Client.Repositories;
 using Budget.Client.Services;
 using Budget.Components;
+using Budget.Models;
 using Budget.Repositories;
 using Budget.Services;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
@@ -21,6 +28,34 @@ builder.Services.AddSingleton<ITransactionRepository>(sp => sp.GetRequiredServic
 builder.Services.AddSingleton<ISyncStatusRepository, SyncStatusRepository>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddScoped<SyncStatusState>();
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+    .AddCookie(options =>
+    {
+        options.LoginPath = "/login";
+        options.ExpireTimeSpan = TimeSpan.FromDays(365);
+        options.SlidingExpiration = true;
+        options.Events.OnValidatePrincipal = context =>
+        {
+            var username = context.Principal?.Identity?.Name;
+            var stamp = context.Principal?.FindFirst("PasswordStamp")?.Value;
+            var configuration = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var user = configuration.GetSection("Auth:Users").Get<List<AuthUser>>()?
+                .FirstOrDefault(u => u.Username == username);
+
+            if (user is null || stamp != ComputePasswordStamp(user.Password))
+            {
+                context.RejectPrincipal();
+            }
+
+            return Task.CompletedTask;
+        };
+    });
+builder.Services.AddAuthorization(options =>
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build());
 
 var app = builder.Build();
 
@@ -35,10 +70,14 @@ else
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapGet("/api/transactions", async (DateOnly from, DateOnly to, ITransactionRepository repo) =>
     await repo.Get(from, to));
+app.MapGet("/api/sync-status/username", async (ISyncStatusRepository repo) =>
+    await repo.GetUsername());
 app.MapGet("/api/sync-status/last-data-update", async (ISyncStatusRepository repo) =>
     await repo.GetLastDataUpdate());
 app.MapPost("/api/sync-status/validate", async ([FromBody] string password, ISyncStatusRepository repo) =>
@@ -46,10 +85,48 @@ app.MapPost("/api/sync-status/validate", async ([FromBody] string password, ISyn
 app.MapPost("/api/sync-status/sync", async ([FromBody] string password, ISyncStatusRepository repo) =>
     await repo.Sync(password));
 
-app.MapStaticAssets();
+app.MapPost("/api/auth/login", async (HttpContext http, IConfiguration configuration) =>
+{
+    var form = await http.Request.ReadFormAsync();
+    var username = form["username"].ToString();
+    var password = form["password"].ToString();
+
+    var user = configuration.GetSection("Auth:Users").Get<List<AuthUser>>()?
+        .FirstOrDefault(u => u.Username == username && u.Password == password);
+
+    if (user is null)
+    {
+        return Results.Redirect("/login?error=1");
+    }
+
+    var claims = new List<Claim>
+    {
+        new(ClaimTypes.Name, user.Username),
+        new(ClaimTypes.Role, user.IsAdmin ? "Admin" : "User"),
+        new("PasswordStamp", ComputePasswordStamp(user.Password))
+    };
+    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+    await http.SignInAsync(
+        CookieAuthenticationDefaults.AuthenticationScheme,
+        new ClaimsPrincipal(identity),
+        new AuthenticationProperties { IsPersistent = true });
+
+    return Results.Redirect("/");
+}).AllowAnonymous();
+
+app.MapGet("/api/auth/logout", async (HttpContext http) =>
+{
+    await http.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    return Results.Redirect("/login");
+}).AllowAnonymous();
+
+app.MapStaticAssets().AllowAnonymous();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(Budget.Client._Imports).Assembly);
 
 app.Run();
+
+string ComputePasswordStamp(string password) =>
+    Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(password)));

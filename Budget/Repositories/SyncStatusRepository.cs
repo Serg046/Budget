@@ -3,8 +3,11 @@ using Budget.Services;
 
 namespace Budget.Repositories;
 
-public class SyncStatusRepository(ISettingsRepository settingsRepository, IConfiguration configuration, SyncService syncService) : ISyncStatusRepository
+public class SyncStatusRepository(ISettingsRepository settingsRepository, IConfiguration configuration, SyncService syncService, IHttpContextAccessor httpContextAccessor) : ISyncStatusRepository
 {
+    public Task<string?> GetUsername() =>
+        Task.FromResult(httpContextAccessor.HttpContext?.User.Identity?.Name);
+
     public async Task<DateTime?> GetLastDataUpdate()
     {
         var settings = await settingsRepository.Get();

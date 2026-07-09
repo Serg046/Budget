@@ -7,18 +7,24 @@
 @inject IJSRuntime JS
 
 <div class="sync-status">
-    <button class="sync-status__button" @onclick="Sync" aria-label="Sync" disabled="@SyncStatusState.IsSyncing">
-        <svg class="sync-status__icon @(SyncStatusState.IsSyncing ? "sync-status__icon--spinning" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M23 4v6h-6"/>
-            <path d="M1 20v-6h6"/>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
-            <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
-        </svg>
-    </button>
-    <span class="sync-status__text">@LastDataUpdate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+    <span class="sync-status__text sync-status__username">@Username</span>
+    <div class="sync-status__row">
+        <button class="sync-status__button" @onclick="Sync" aria-label="Sync" disabled="@SyncStatusState.IsSyncing">
+            <svg class="sync-status__icon @(SyncStatusState.IsSyncing ? "sync-status__icon--spinning" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M23 4v6h-6"/>
+                <path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
+                <path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/>
+            </svg>
+        </button>
+        <span class="sync-status__text">@LastDataUpdate?.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+    </div>
 </div>
 
 @code {
+    [PersistentState]
+    public string? Username { get; set; }
+
     [PersistentState]
     public DateTime? LastDataUpdate { get; set; }
 
@@ -34,6 +40,7 @@
 
     private async Task Load()
     {
+        Username = await SyncStatusRepository.GetUsername();
         LastDataUpdate = await SyncStatusRepository.GetLastDataUpdate();
     }
 
