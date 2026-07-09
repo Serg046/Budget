@@ -1,0 +1,41 @@
+@using System.Globalization
+@using System.Text.RegularExpressions
+@using Budget.Client.Models
+
+<div class="creditor-summary">
+    <h2 class="creditor-summary__title">By Creditor</h2>
+    <ul class="creditor-summary__list">
+        @foreach (var creditor in GetCreditorTotals())
+        {
+            <li class="creditor-summary__item">
+                <span class="creditor-summary__name">@creditor.Name</span>
+                <span class="creditor-summary__total">@creditor.Total.ToString("0.00", CultureInfo.InvariantCulture) @creditor.Currency</span>
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    [Parameter]
+    public List<TransactionDocument>? Transactions { get; set; }
+
+    private static readonly Regex TrailingNumberPattern = new(@"\s*\d+(\s+\d+)*\s*$", RegexOptions.Compiled);
+
+    private IEnumerable<(string Name, decimal Total, string Currency)> GetCreditorTotals()
+    {
+        return (Transactions ?? [])
+            .Where(t => t.Creditor?.Name is not null)
+            .GroupBy(t => NormalizeCreditorName(t.Creditor!.Name!))
+            .Select(g => (
+                Name: g.Key,
+                Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),
+                Currency: g.First().TransactionAmount.Currency))
+            .OrderByDescending(g => g.Total);
+    }
+
+    private static string NormalizeCreditorName(string name)
+    {
+        var normalized = TrailingNumberPattern.Replace(name, "").TrimEnd();
+        return normalized.Length == 0 ? name : normalized;
+    }
+}

@@ -1,4 +1,5 @@
 .month-picker {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -37,6 +38,30 @@
 
 .month-picker__nav:active {
     background-color: #e6d5ee;
+}
+
+.page-columns {
+    display: flex;
+    gap: 1.5rem;
+    align-items: stretch;
+    flex: 1;
+    min-height: 0;
+}
+
+.page-columns__main {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    overflow-y: auto;
+}
+
+.page-columns__sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    width: 24rem;
+    flex-shrink: 0;
+    height: 100%;
 }
 
 table th,
