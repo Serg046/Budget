@@ -1,12 +1,14 @@
 @rendermode InteractiveAuto
 @using Budget.Client.Repositories
+@using Budget.Client.Services
 @using Microsoft.AspNetCore.Components
 @inject ISyncStatusRepository SyncStatusRepository
+@inject SyncStatusState SyncStatusState
 @inject IJSRuntime JS
 
 <div class="sync-status">
-    <button class="sync-status__button" @onclick="Sync" aria-label="Sync" disabled="@_isSyncing">
-        <svg class="sync-status__icon @(_isSyncing ? "sync-status__icon--spinning" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <button class="sync-status__button" @onclick="Sync" aria-label="Sync" disabled="@SyncStatusState.IsSyncing">
+        <svg class="sync-status__icon @(SyncStatusState.IsSyncing ? "sync-status__icon--spinning" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M23 4v6h-6"/>
             <path d="M1 20v-6h6"/>
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/>
@@ -19,8 +21,6 @@
 @code {
     [PersistentState]
     public DateTime? LastDataUpdate { get; set; }
-
-    private bool _isSyncing;
 
     protected override async Task OnInitializedAsync()
     {
@@ -45,20 +45,19 @@
             return;
         }
 
-        _isSyncing = true;
+        SyncStatusState.IsSyncing = true;
 
-        var isValid = await SyncStatusRepository.ValidatePassword(password);
-        if (isValid)
+        var result = await SyncStatusRepository.Sync(password);
+        if (result is not null)
         {
-            // TODO: wire up the actual synchronization action.
-            await Load();
-            await JS.InvokeVoidAsync("alert", "Success!");
+            LastDataUpdate = result;
+            SyncStatusState.NotifySyncCompleted();
         }
         else
         {
-            await JS.InvokeVoidAsync("alert", "Incorrect password.");
+            await JS.InvokeVoidAsync("alert", "Sync failed.");
         }
 
-        _isSyncing = false;
+        SyncStatusState.IsSyncing = false;
     }
 }

@@ -1,0 +1,36 @@
+.status-bar {
+    position: fixed;
+    top: 3.5rem;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+@media (min-width: 641px) {
+    .status-bar {
+        left: 250px;
+        width: calc(100% - 250px);
+    }
+}
+
+.status-bar::after {
+    content: "";
+    display: block;
+    width: 30%;
+    height: 100%;
+    background: #3a0647;
+    opacity: 0.5;
+    animation: status-bar-slide 1.2s ease-in-out infinite;
+}
+
+@keyframes status-bar-slide {
+    0% {
+        transform: translateX(-100%);
+    }
+
+    100% {
+        transform: translateX(400%);
+    }
+}

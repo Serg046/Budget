@@ -16,4 +16,20 @@ public class SettingsRepository : ISettingsRepository
     {
         return await _collection.Find(FilterDefinition<SettingsDocument>.Empty).SingleAsync();
     }
+
+    public async Task UpdateLastDataUpdate(DateTime lastDataUpdate)
+    {
+        var update = Builders<SettingsDocument>.Update
+            .Set(s => s.BankSession.LastDataUpdate, lastDataUpdate);
+
+        await _collection.UpdateOneAsync(FilterDefinition<SettingsDocument>.Empty, update);
+    }
+
+    public async Task UpdateLastTokenUpdate(DateTime lastTokenUpdate)
+    {
+        var update = Builders<SettingsDocument>.Update
+            .Set(s => s.BankSession.LastTokenUpdate, lastTokenUpdate);
+
+        await _collection.UpdateOneAsync(FilterDefinition<SettingsDocument>.Empty, update);
+    }
 }

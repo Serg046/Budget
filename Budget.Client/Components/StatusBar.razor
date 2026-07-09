@@ -1,0 +1,23 @@
+@rendermode InteractiveAuto
+@using Budget.Client.Services
+@implements IDisposable
+@inject SyncStatusState SyncStatusState
+
+@if (RendererInfo.Name != "WebAssembly" || SyncStatusState.IsSyncing)
+{
+    <div class="status-bar" aria-hidden="true"></div>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        SyncStatusState.Changed += OnChanged;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        SyncStatusState.Changed -= OnChanged;
+    }
+}

@@ -31,4 +31,20 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
             .ThenByDescending(t => t.BookingDate)
             .ToList();
     }
+
+    public async Task<HashSet<string>> GetExistingEntryReferences(IEnumerable<string> entryReferences)
+    {
+        var filter = Builders<TransactionDocument>.Filter.In(t => t.EntryReference, entryReferences);
+
+        var existing = await _collection.Find(filter)
+            .Project(t => t.EntryReference)
+            .ToListAsync();
+
+        return existing.ToHashSet()!;
+    }
+
+    public async Task DeleteWithoutEntryReference()
+    {
+        await _collection.DeleteManyAsync(Builders<TransactionDocument>.Filter.Eq(t => t.EntryReference, null));
+    }
 }

@@ -3,15 +3,13 @@
 @using System.Text.Json
 @using Budget.Client.Models
 @using Budget.Client.Repositories
+@using Budget.Client.Services
+@implements IDisposable
 @inject ITransactionRepository TransactionRepository
+@inject SyncStatusState SyncStatusState
 @inject IJSRuntime JS
 
 <PageTitle>Home</PageTitle>
-
-@if (RendererInfo.Name != "WebAssembly")
-{
-    <div class="wasm-loader" aria-hidden="true"></div>
-}
 
 <div class="month-picker">
     <button class="month-picker__nav" @onclick="PreviousMonth" aria-label="Previous month">&#8249;</button>
@@ -66,6 +64,8 @@
 
     protected override async Task OnInitializedAsync()
     {
+        SyncStatusState.SyncCompleted += OnSyncCompleted;
+
         if (Transactions is not null)
         {
             return;
@@ -73,6 +73,20 @@
 
         Month = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
         await LoadTransactions();
+    }
+
+    private void OnSyncCompleted()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadTransactions();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SyncStatusState.SyncCompleted -= OnSyncCompleted;
     }
 
     private async Task PreviousMonth()

@@ -14,4 +14,10 @@ public class SyncStatusApiClient(HttpClient http) : ISyncStatusRepository
         var response = await http.PostAsJsonAsync("api/sync-status/validate", password);
         return await response.Content.ReadFromJsonAsync<bool>();
     }
+
+    public async Task<DateTime?> Sync(string password)
+    {
+        var response = await http.PostAsJsonAsync("api/sync-status/sync", password);
+        return await response.Content.ReadFromJsonAsync<DateTime?>();
+    }
 }
