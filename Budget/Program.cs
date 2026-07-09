@@ -10,7 +10,6 @@ using Budget.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -78,12 +77,16 @@ app.MapGet("/api/transactions", async (DateOnly from, DateOnly to, ITransactionR
     await repo.Get(from, to));
 app.MapGet("/api/sync-status/username", async (ISyncStatusRepository repo) =>
     await repo.GetUsername());
+app.MapGet("/api/sync-status/is-admin", async (ISyncStatusRepository repo) =>
+    await repo.IsAdmin());
 app.MapGet("/api/sync-status/last-data-update", async (ISyncStatusRepository repo) =>
     await repo.GetLastDataUpdate());
-app.MapPost("/api/sync-status/validate", async ([FromBody] string password, ISyncStatusRepository repo) =>
-    await repo.ValidatePassword(password));
-app.MapPost("/api/sync-status/sync", async ([FromBody] string password, ISyncStatusRepository repo) =>
-    await repo.Sync(password));
+app.MapPost("/api/sync-status/sync", async (ISyncStatusRepository repo) =>
+    await repo.Sync())
+    .RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapPost("/api/sync-status/refresh-token", async (ISyncStatusRepository repo) =>
+    await repo.RefreshToken())
+    .RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
 
 app.MapPost("/api/auth/login", async (HttpContext http, IConfiguration configuration) =>
 {

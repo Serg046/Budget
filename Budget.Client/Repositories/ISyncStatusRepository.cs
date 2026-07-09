@@ -4,9 +4,11 @@ public interface ISyncStatusRepository
 {
     Task<string?> GetUsername();
 
+    Task<bool> IsAdmin();
+
     Task<DateTime?> GetLastDataUpdate();
 
-    Task<bool> ValidatePassword(string password);
+    Task<DateTime?> Sync();
 
-    Task<DateTime?> Sync(string password);
+    Task RefreshToken();
 }

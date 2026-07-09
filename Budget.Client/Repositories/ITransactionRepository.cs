@@ -4,7 +4,7 @@ namespace Budget.Client.Repositories;
 
 public interface ITransactionRepository
 {
-    Task Save(IEnumerable<TransactionDocument> transactions);
+    Task Save(IReadOnlyList<TransactionDocument> transactions);
 
     Task<List<TransactionDocument>> Get(DateOnly from, DateOnly to);
 }

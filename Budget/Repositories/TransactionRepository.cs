@@ -8,15 +8,9 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
 {
     private readonly IMongoCollection<TransactionDocument> _collection = database.GetCollection<TransactionDocument>("transactions");
 
-    public async Task Save(IEnumerable<TransactionDocument> transactions)
+    public async Task Save(IReadOnlyList<TransactionDocument> transactions)
     {
-        var list = transactions.ToList();
-        if (list.Count == 0)
-        {
-            return;
-        }
-
-        await _collection.InsertManyAsync(list);
+        await _collection.InsertManyAsync(transactions);
     }
 
     public async Task<List<TransactionDocument>> Get(DateOnly from, DateOnly to)

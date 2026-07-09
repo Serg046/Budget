@@ -9,20 +9,24 @@ public class SyncStatusApiClient(HttpClient http) : ISyncStatusRepository
         return await http.GetFromJsonAsync<string?>("api/sync-status/username");
     }
 
+    public async Task<bool> IsAdmin()
+    {
+        return await http.GetFromJsonAsync<bool>("api/sync-status/is-admin");
+    }
+
     public async Task<DateTime?> GetLastDataUpdate()
     {
         return await http.GetFromJsonAsync<DateTime?>("api/sync-status/last-data-update");
     }
 
-    public async Task<bool> ValidatePassword(string password)
+    public async Task<DateTime?> Sync()
     {
-        var response = await http.PostAsJsonAsync("api/sync-status/validate", password);
-        return await response.Content.ReadFromJsonAsync<bool>();
+        var response = await http.PostAsync("api/sync-status/sync", null);
+        return await response.Content.ReadFromJsonAsync<DateTime?>();
     }
 
-    public async Task<DateTime?> Sync(string password)
+    public async Task RefreshToken()
     {
-        var response = await http.PostAsJsonAsync("api/sync-status/sync", password);
-        return await response.Content.ReadFromJsonAsync<DateTime?>();
+        await http.PostAsync("api/sync-status/refresh-token", null);
     }
 }

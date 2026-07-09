@@ -3,10 +3,13 @@ using Budget.Services;
 
 namespace Budget.Repositories;
 
-public class SyncStatusRepository(ISettingsRepository settingsRepository, IConfiguration configuration, SyncService syncService, IHttpContextAccessor httpContextAccessor) : ISyncStatusRepository
+public class SyncStatusRepository(ISettingsRepository settingsRepository, SyncService syncService, IHttpContextAccessor httpContextAccessor) : ISyncStatusRepository
 {
     public Task<string?> GetUsername() =>
         Task.FromResult(httpContextAccessor.HttpContext?.User.Identity?.Name);
+
+    public Task<bool> IsAdmin() =>
+        Task.FromResult(httpContextAccessor.HttpContext?.User.IsInRole("Admin") ?? false);
 
     public async Task<DateTime?> GetLastDataUpdate()
     {
@@ -14,35 +17,15 @@ public class SyncStatusRepository(ISettingsRepository settingsRepository, IConfi
         return settings.BankSession.LastDataUpdate;
     }
 
-    public Task<bool> ValidatePassword(string password)
+    public async Task<DateTime?> Sync()
     {
-        var expected = configuration["Sync:Password"];
-        return Task.FromResult(!string.IsNullOrEmpty(expected) && password == expected);
-    }
-
-    public async Task<DateTime?> Sync(string password)
-    {
-        var isDataSync = await ValidatePassword(password);
-        var isTokenRefresh = IsTokenRefreshPassword(password);
-
-        if (!isDataSync && !isTokenRefresh)
-        {
-            return null;
-        }
-
         await syncService.Sync();
-
-        if (isTokenRefresh)
-        {
-            await syncService.RefreshToken();
-        }
-
         return await GetLastDataUpdate();
     }
 
-    private bool IsTokenRefreshPassword(string password)
+    public async Task RefreshToken()
     {
-        var expected = configuration["Sync:TokenRefreshPassword"];
-        return !string.IsNullOrEmpty(expected) && password == expected;
+        await Task.Delay(5000);
+        await syncService.RefreshToken();
     }
 }

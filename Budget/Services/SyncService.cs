@@ -24,12 +24,17 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
         using var http = new HttpClient { BaseAddress = new Uri("https://api.enablebanking.com/") };
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
-        await transactionRepository.DeleteWithoutEntryReference();
-
         string? continuationKey = null;
+        var isFirstPage = true;
         do
         {
             var (transactions, nextContinuationKey) = await FetchPage(http, settings.BankSession.Account, continuationKey);
+
+            if (isFirstPage)
+            {
+                await transactionRepository.DeleteWithoutEntryReference();
+                isFirstPage = false;
+            }
 
             var entryReferences = transactions
                 .Where(t => t.EntryReference is not null)
