@@ -17,18 +17,13 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
     public async Task Sync()
     {
         var settings = await settingsRepository.Get();
-
-        var rsa = LoadPrivateKey(configuration["EnableBanking:PrivateKeyPath"]!);
-        var jwt = BuildJwt(settings.BankSession.ApplicationId, rsa);
-
-        using var http = new HttpClient { BaseAddress = new Uri("https://api.enablebanking.com/") };
-        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+        using var http = CreateHttpClient(settings.BankSession.ApplicationId);
 
         string? continuationKey = null;
         var isFirstPage = true;
         do
         {
-            var (transactions, nextContinuationKey) = await FetchPage(http, settings.BankSession.Account, continuationKey);
+            var (transactions, nextContinuationKey) = await FetchPage(http, settings.BankSession.AccountId, continuationKey);
 
             if (isFirstPage)
             {
@@ -53,11 +48,70 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
         await settingsRepository.UpdateLastDataUpdate(DateTime.UtcNow);
     }
 
-    public async Task RefreshToken()
+    public async Task<string?> RefreshToken(string? code = null)
     {
-        // TODO: actually request a fresh token from the bank; for now just record that a refresh happened.
-        await settingsRepository.UpdateLastTokenUpdate(DateTime.UtcNow);
+        var settings = await settingsRepository.Get();
+        using var http = CreateHttpClient(settings.BankSession.ApplicationId);
+
+        if (code is null)
+        {
+            var aspsp = await FindAspsp(http, configuration["EnableBanking:AspspCountry"]!, configuration["EnableBanking:AspspNameContains"]!);
+            return await StartAuthorization(http, aspsp.Name, aspsp.Country, Guid.NewGuid().ToString());
+        }
+
+        var account = await AuthorizeSession(http, code);
+        await settingsRepository.UpdateAccount(account, DateTime.UtcNow);
+        return null;
     }
+    
+    async Task<string> StartAuthorization(HttpClient http, string aspspName, string aspspCountry, string stateValue)
+    {
+        var payload = new
+        {
+            access = new { valid_until = DateTimeOffset.UtcNow.AddDays(90).ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz") },
+            aspsp = new { name = aspspName, country = aspspCountry },
+            state = stateValue,
+            redirect_url = configuration["EnableBanking:RedirectUrl"]!,
+            psu_type = "personal"
+        };
+        var resp = await http.PostAsync("auth", CreateJsonContent(payload));
+        var json = await ParseOrThrow(resp);
+        return json.GetProperty("url").GetString()
+            ?? throw new Exception("Authorization failed");
+    }
+
+    private HttpClient CreateHttpClient(string applicationId)
+    {
+        var rsa = LoadPrivateKey(configuration["EnableBanking:PrivateKeyPath"]!);
+        var jwt = BuildJwt(applicationId, rsa);
+
+        var http = new HttpClient { BaseAddress = new Uri("https://api.enablebanking.com/") };
+        http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
+        return http;
+    }
+    
+    async Task<string> AuthorizeSession(HttpClient http, string code)
+    {
+        var payload = new { code };
+        var resp = await http.PostAsync("sessions", CreateJsonContent(payload));
+        var json = await ParseOrThrow(resp);
+        var account = json.GetProperty("accounts").EnumerateArray().First();
+        return account.GetProperty("uid").GetString()
+               ?? throw new Exception("Account not found");
+    }
+    
+    async Task<JsonElement> ParseOrThrow(HttpResponseMessage resp)
+    {
+        var body = await resp.Content.ReadAsStringAsync();
+        if (!resp.IsSuccessStatusCode)
+        {
+            throw new Exception($"Request failed ({resp.StatusCode}): {body}");
+        }
+        return JsonDocument.Parse(body).RootElement;
+    }
+    
+    StringContent CreateJsonContent(object payload) =>
+        new(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
     private static async Task<(List<TransactionDocument> Transactions, string? ContinuationKey)> FetchPage(HttpClient http, string accountUid, string? continuationKey)
     {
@@ -110,6 +164,22 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
 
     private static string Base64UrlEncode(byte[] bytes) =>
         Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    
+    async Task<(string Name, string Country)> FindAspsp(HttpClient http, string country, string nameContains)
+    {
+        var resp = await http.GetAsync($"aspsps?country={country}");
+        var json = await ParseOrThrow(resp);
+        foreach (var a in json.GetProperty("aspsps").EnumerateArray())
+        {
+            var name = a.GetProperty("name").GetString() ?? "";
+            if (name.Contains(nameContains, StringComparison.OrdinalIgnoreCase))
+            {
+                return (name, a.GetProperty("country").GetString()!);
+            }
+        }
+        
+        throw new Exception("Could not find DSK Bank automatically. Check GET /aspsps?country=BG manually.");
+    }
 
     private class TransactionsPage
     {

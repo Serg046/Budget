@@ -23,9 +23,5 @@ public class SyncStatusRepository(ISettingsRepository settingsRepository, SyncSe
         return await GetLastDataUpdate();
     }
 
-    public async Task RefreshToken()
-    {
-        await Task.Delay(5000);
-        await syncService.RefreshToken();
-    }
+    public async Task<string?> RefreshToken(string? code = null) => await syncService.RefreshToken(code);
 }

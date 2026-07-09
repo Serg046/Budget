@@ -9,4 +9,6 @@ public interface ISettingsRepository
     Task UpdateLastDataUpdate(DateTime lastDataUpdate);
 
     Task UpdateLastTokenUpdate(DateTime lastTokenUpdate);
+
+    Task UpdateAccount(string account, DateTime lastTokenUpdate);
 }

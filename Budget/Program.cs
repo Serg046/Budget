@@ -84,8 +84,8 @@ app.MapGet("/api/sync-status/last-data-update", async (ISyncStatusRepository rep
 app.MapPost("/api/sync-status/sync", async (ISyncStatusRepository repo) =>
     await repo.Sync())
     .RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
-app.MapPost("/api/sync-status/refresh-token", async (ISyncStatusRepository repo) =>
-    await repo.RefreshToken())
+app.MapPost("/api/sync-status/refresh-token", async (string? code, ISyncStatusRepository repo) =>
+    Results.Json(await repo.RefreshToken(code)))
     .RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
 
 app.MapPost("/api/auth/login", async (HttpContext http, IConfiguration configuration) =>

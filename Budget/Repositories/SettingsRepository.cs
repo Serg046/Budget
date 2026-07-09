@@ -32,4 +32,13 @@ public class SettingsRepository : ISettingsRepository
 
         await _collection.UpdateOneAsync(FilterDefinition<SettingsDocument>.Empty, update);
     }
+
+    public async Task UpdateAccount(string accountId, DateTime lastTokenUpdate)
+    {
+        var update = Builders<SettingsDocument>.Update
+            .Set(s => s.BankSession.AccountId, accountId)
+            .Set(s => s.BankSession.LastTokenUpdate, lastTokenUpdate);
+
+        await _collection.UpdateOneAsync(FilterDefinition<SettingsDocument>.Empty, update);
+    }
 }

@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace Budget.Client.Repositories;
 
@@ -25,8 +26,13 @@ public class SyncStatusApiClient(HttpClient http) : ISyncStatusRepository
         return await response.Content.ReadFromJsonAsync<DateTime?>();
     }
 
-    public async Task RefreshToken()
+    public async Task<string?> RefreshToken(string? code = null)
     {
-        await http.PostAsync("api/sync-status/refresh-token", null);
+        var url = code is null
+            ? "api/sync-status/refresh-token"
+            : $"api/sync-status/refresh-token?code={Uri.EscapeDataString(code)}";
+        var response = await http.PostAsync(url, null);
+        var body = await response.Content.ReadAsStringAsync();
+        return string.IsNullOrEmpty(body) ? null : JsonSerializer.Deserialize<string>(body);
     }
 }

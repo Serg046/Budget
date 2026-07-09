@@ -14,8 +14,8 @@ public class SettingsDocument
 
 public class BankSession
 {
-    [BsonElement("account")]
-    public string Account { get; set; } = string.Empty;
+    [BsonElement("accountId")]
+    public string AccountId { get; set; } = string.Empty;
 
     [BsonElement("applicationId")]
     public string ApplicationId { get; set; } = string.Empty;

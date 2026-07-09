@@ -4,13 +4,14 @@
 @using Microsoft.AspNetCore.Components
 @inject ISyncStatusRepository SyncStatusRepository
 @inject SyncStatusState SyncStatusState
+@inject NavigationManager NavigationManager
 
 <div class="sync-status">
     <span class="sync-status__text sync-status__username">@Username</span>
     <div class="sync-status__row">
         @if (IsAdmin)
         {
-            <button class="sync-status__button" @onclick="RefreshToken" aria-label="Refresh Enable Banking token" disabled="@SyncStatusState.IsSyncing">
+            <button class="sync-status__button" @onclick="() => RefreshToken()" aria-label="Refresh Enable Banking token" disabled="@SyncStatusState.IsSyncing">
                 <svg class="sync-status__icon @(_isRefreshingToken ? "sync-status__icon--pulsing" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 20 7 4 7"/>
                     <line x1="6" y1="11" x2="6" y2="18"/>
@@ -48,12 +49,37 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (LastDataUpdate is not null)
+        if (LastDataUpdate is null)
+        {
+            await Load();
+        }
+
+        if (!RendererInfo.IsInteractive)
         {
             return;
         }
 
-        await Load();
+        var code = GetQueryParam("code");
+        if (code is not null)
+        {
+            NavigationManager.NavigateTo(NavigationManager.Uri.Split('?')[0], replace: true);
+            await RefreshToken(code);
+        }
+    }
+
+    private string? GetQueryParam(string name)
+    {
+        var query = new Uri(NavigationManager.Uri).Query.TrimStart('?');
+        foreach (var pair in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var parts = pair.Split('=', 2);
+            if (parts.Length == 2 && Uri.UnescapeDataString(parts[0]) == name)
+            {
+                return Uri.UnescapeDataString(parts[1]);
+            }
+        }
+
+        return null;
     }
 
     private async Task Load()
@@ -73,14 +99,19 @@
         SyncStatusState.IsSyncing = true;
         _isSyncing = true;
 
-        LastDataUpdate = await SyncStatusRepository.Sync();
-        SyncStatusState.NotifySyncCompleted();
-
-        SyncStatusState.IsSyncing = false;
-        _isSyncing = false;
+        try
+        {
+            LastDataUpdate = await SyncStatusRepository.Sync();
+            SyncStatusState.NotifySyncCompleted();
+        }
+        finally
+        {
+            SyncStatusState.IsSyncing = false;
+            _isSyncing = false;
+        }
     }
 
-    private async Task RefreshToken()
+    private async Task RefreshToken(string? code = null)
     {
         if (!IsAdmin)
         {
@@ -90,9 +121,24 @@
         SyncStatusState.IsSyncing = true;
         _isRefreshingToken = true;
 
-        await SyncStatusRepository.RefreshToken();
+        string? authUrl;
+        try
+        {
+            authUrl = await SyncStatusRepository.RefreshToken(code);
+        }
+        finally
+        {
+            SyncStatusState.IsSyncing = false;
+            _isRefreshingToken = false;
+        }
 
-        SyncStatusState.IsSyncing = false;
-        _isRefreshingToken = false;
+        if (authUrl is not null)
+        {
+            NavigationManager.NavigateTo(authUrl, forceLoad: true);
+        }
+        else if (code is not null)
+        {
+            await Sync();
+        }
     }
 }

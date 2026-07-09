@@ -10,6 +10,11 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
 
     public async Task Save(IReadOnlyList<TransactionDocument> transactions)
     {
+        if (transactions.Count == 0)
+        {
+            return;
+        }
+
         await _collection.InsertManyAsync(transactions);
     }
 

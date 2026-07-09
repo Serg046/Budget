@@ -10,5 +10,5 @@ public interface ISyncStatusRepository
 
     Task<DateTime?> Sync();
 
-    Task RefreshToken();
+    Task<string?> RefreshToken(string? code = null);
 }
