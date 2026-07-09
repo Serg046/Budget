@@ -11,7 +11,7 @@
     <div class="sync-status__row">
         @if (IsAdmin)
         {
-            <button class="sync-status__button" @onclick="() => RefreshToken()" aria-label="Refresh Enable Banking token" disabled="@SyncStatusState.IsSyncing">
+            <button class="sync-status__button @(IsTokenExpiringSoon ? "sync-status__button--warning" : "")" @onclick="() => RefreshToken()" aria-label="Refresh Enable Banking token" disabled="@SyncStatusState.IsSyncing">
                 <svg class="sync-status__icon @(_isRefreshingToken ? "sync-status__icon--pulsing" : "")" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polygon points="12 2 20 7 4 7"/>
                     <line x1="6" y1="11" x2="6" y2="18"/>
@@ -43,6 +43,9 @@
 
     [PersistentState]
     public DateTime? LastDataUpdate { get; set; }
+
+    [PersistentState]
+    public bool IsTokenExpiringSoon { get; set; }
 
     private bool _isSyncing;
     private bool _isRefreshingToken;
@@ -87,6 +90,7 @@
         Username = await SyncStatusRepository.GetUsername();
         IsAdmin = await SyncStatusRepository.IsAdmin();
         LastDataUpdate = await SyncStatusRepository.GetLastDataUpdate();
+        IsTokenExpiringSoon = await SyncStatusRepository.IsTokenExpiringSoon();
     }
 
     private async Task Sync()
@@ -138,6 +142,7 @@
         }
         else if (code is not null)
         {
+            IsTokenExpiringSoon = false;
             await Sync();
         }
     }

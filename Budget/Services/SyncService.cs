@@ -27,7 +27,11 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
 
             if (isFirstPage)
             {
-                await transactionRepository.DeleteWithoutEntryReference();
+                if (transactions.Any())
+                {
+                    await transactionRepository.DeleteWithoutEntryReference();
+                }
+
                 isFirstPage = false;
             }
 
@@ -68,7 +72,7 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
     {
         var payload = new
         {
-            access = new { valid_until = DateTimeOffset.UtcNow.AddDays(90).ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz") },
+            access = new { valid_until = DateTimeOffset.UtcNow.AddDays(configuration.GetValue<int>("EnableBanking:TokenLifetimeDays")).ToString("yyyy-MM-ddTHH:mm:ss.ffffffzzz") },
             aspsp = new { name = aspspName, country = aspspCountry },
             state = stateValue,
             redirect_url = configuration["EnableBanking:RedirectUrl"]!,

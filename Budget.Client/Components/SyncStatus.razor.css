@@ -34,6 +34,18 @@
     cursor: default;
 }
 
+.sync-status__button--warning {
+    color: #e0a030;
+}
+
+.sync-status__button--warning:hover:not(:disabled) {
+    color: #f0b040;
+}
+
+.sync-status__button--warning .sync-status__icon {
+    stroke-width: 3;
+}
+
 .sync-status__icon {
     width: 1rem;
     height: 1rem;

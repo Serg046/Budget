@@ -81,6 +81,8 @@ app.MapGet("/api/sync-status/is-admin", async (ISyncStatusRepository repo) =>
     await repo.IsAdmin());
 app.MapGet("/api/sync-status/last-data-update", async (ISyncStatusRepository repo) =>
     await repo.GetLastDataUpdate());
+app.MapGet("/api/sync-status/is-token-expiring-soon", async (ISyncStatusRepository repo) =>
+    await repo.IsTokenExpiringSoon());
 app.MapPost("/api/sync-status/sync", async (ISyncStatusRepository repo) =>
     await repo.Sync())
     .RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });

@@ -3,8 +3,10 @@ using Budget.Services;
 
 namespace Budget.Repositories;
 
-public class SyncStatusRepository(ISettingsRepository settingsRepository, SyncService syncService, IHttpContextAccessor httpContextAccessor) : ISyncStatusRepository
+public class SyncStatusRepository(ISettingsRepository settingsRepository, SyncService syncService, IHttpContextAccessor httpContextAccessor, IConfiguration configuration) : ISyncStatusRepository
 {
+    private const int TokenExpiryWarningDays = 3;
+
     public Task<string?> GetUsername() =>
         Task.FromResult(httpContextAccessor.HttpContext?.User.Identity?.Name);
 
@@ -15,6 +17,14 @@ public class SyncStatusRepository(ISettingsRepository settingsRepository, SyncSe
     {
         var settings = await settingsRepository.Get();
         return settings.BankSession.LastDataUpdate;
+    }
+
+    public async Task<bool> IsTokenExpiringSoon()
+    {
+        var settings = await settingsRepository.Get();
+        var lifetimeDays = configuration.GetValue<int>("EnableBanking:TokenLifetimeDays");
+        var expiresAt = settings.BankSession.LastTokenUpdate.AddDays(lifetimeDays);
+        return expiresAt - DateTime.UtcNow <= TimeSpan.FromDays(TokenExpiryWarningDays);
     }
 
     public async Task<DateTime?> Sync()

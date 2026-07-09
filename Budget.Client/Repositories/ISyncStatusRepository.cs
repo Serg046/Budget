@@ -8,6 +8,8 @@ public interface ISyncStatusRepository
 
     Task<DateTime?> GetLastDataUpdate();
 
+    Task<bool> IsTokenExpiringSoon();
+
     Task<DateTime?> Sync();
 
     Task<string?> RefreshToken(string? code = null);

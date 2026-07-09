@@ -20,6 +20,11 @@ public class SyncStatusApiClient(HttpClient http) : ISyncStatusRepository
         return await http.GetFromJsonAsync<DateTime?>("api/sync-status/last-data-update");
     }
 
+    public async Task<bool> IsTokenExpiringSoon()
+    {
+        return await http.GetFromJsonAsync<bool>("api/sync-status/is-token-expiring-soon");
+    }
+
     public async Task<DateTime?> Sync()
     {
         var response = await http.PostAsync("api/sync-status/sync", null);
