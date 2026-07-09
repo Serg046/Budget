@@ -1,0 +1,51 @@
+.sync-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    margin-top: auto;
+    padding: 1rem;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.sync-status__button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    padding: 0;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+}
+
+.sync-status__button:hover {
+    color: #fff;
+}
+
+.sync-status__button:disabled {
+    cursor: default;
+}
+
+.sync-status__icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+.sync-status__icon--spinning {
+    animation: sync-status-spin 1s linear infinite;
+}
+
+.sync-status__text {
+    font-size: 0.85rem;
+}
+
+@keyframes sync-status-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}

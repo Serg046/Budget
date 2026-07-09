@@ -5,6 +5,7 @@ using System.Text.Json;
 using Budget.Client.Repositories;
 using Budget.Components;
 using Budget.Repositories;
+using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,7 @@ builder.Services.AddSingleton(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(builder.Configuration["MongoDb:DatabaseName"]));
 builder.Services.AddSingleton<ISettingsRepository, SettingsRepository>();
 builder.Services.AddSingleton<ITransactionRepository, TransactionRepository>();
+builder.Services.AddSingleton<ISyncStatusRepository, SyncStatusRepository>();
 
 var app = builder.Build();
 
@@ -42,6 +44,10 @@ app.UseAntiforgery();
 
 app.MapGet("/api/transactions", async (DateOnly from, DateOnly to, ITransactionRepository repo) =>
     await repo.Get(from, to));
+app.MapGet("/api/sync-status/last-data-update", async (ISyncStatusRepository repo) =>
+    await repo.GetLastDataUpdate());
+app.MapPost("/api/sync-status/validate", async ([FromBody] string password, ISyncStatusRepository repo) =>
+    await repo.ValidatePassword(password));
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()

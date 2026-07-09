@@ -14,15 +14,15 @@ public class SettingsDocument
 
 public class BankSession
 {
-    [BsonElement("id")]
-    public string Id { get; set; } = string.Empty;
-
     [BsonElement("account")]
     public string Account { get; set; } = string.Empty;
 
     [BsonElement("applicationId")]
     public string ApplicationId { get; set; } = string.Empty;
 
-    [BsonElement("isActive")]
-    public bool IsActive { get; set; }
+    [BsonElement("lastTokenUpdate")]
+    public DateTime LastTokenUpdate { get; set; }
+
+    [BsonElement("lastDataUpdate")]
+    public DateTime LastDataUpdate { get; set; }
 }
