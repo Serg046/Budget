@@ -1,5 +1,6 @@
 @page "/"
 @rendermode InteractiveAuto
+@using System.Globalization
 @using System.Text.Json
 @using Budget.Client.Components
 @using Budget.Client.Models
@@ -25,7 +26,7 @@
                 <tr>
                     <th>Date</th>
                     <th>Amount</th>
-                    <th>Creditor</th>
+                    <th>Merchant</th>
                 </tr>
             </thead>
             <tbody>
@@ -33,7 +34,7 @@
                 {
                     <tr @onclick="() => ShowDetails(t)">
                         <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
-                        <td>@t.TransactionAmount.Value @t.TransactionAmount.Currency</td>
+                        <td>@(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null ? "+" : "")@FormatCurrency(t.TransactionAmount.Currency)@FormatAmount(t.TransactionAmount.Value)</td>
                         <td>@t.Creditor?.Name</td>
                     </tr>
                 }
@@ -63,6 +64,16 @@
 
 @code {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    private static string FormatCurrency(string currency) => currency switch
+    {
+        "EUR" => "€",
+        "RUB" => "₽",
+        _ => currency
+    };
+
+    private static string FormatAmount(string amount) =>
+        decimal.Parse(amount, CultureInfo.InvariantCulture).ToString("0.00", CultureInfo.InvariantCulture);
 
     [PersistentState]
     public DateOnly Month { get; set; }

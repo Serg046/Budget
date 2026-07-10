@@ -3,13 +3,13 @@
 @using Budget.Client.Models
 
 <div class="creditor-summary">
-    <h2 class="creditor-summary__title">By Creditor</h2>
+    <h2 class="creditor-summary__title">By Merchant</h2>
     <ul class="creditor-summary__list">
         @foreach (var creditor in GetCreditorTotals())
         {
             <li class="creditor-summary__item">
                 <span class="creditor-summary__name">@creditor.Name</span>
-                <span class="creditor-summary__total">@creditor.Total.ToString("0.00", CultureInfo.InvariantCulture) @creditor.Currency</span>
+                <span class="creditor-summary__total">@(creditor.ShowPlus ? "+" : "")@FormatCurrency(creditor.Currency)@creditor.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
             </li>
         }
     </ul>
@@ -21,7 +21,7 @@
 
     private static readonly Regex TrailingNumberPattern = new(@"\s*\d+(\s+\d+)*\s*$", RegexOptions.Compiled);
 
-    private IEnumerable<(string Name, decimal Total, string Currency)> GetCreditorTotals()
+    private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetCreditorTotals()
     {
         return (Transactions ?? [])
             .Where(t => t.Creditor?.Name is not null)
@@ -29,7 +29,8 @@
             .Select(g => (
                 Name: g.Key,
                 Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),
-                Currency: g.First().TransactionAmount.Currency))
+                Currency: g.First().TransactionAmount.Currency,
+                ShowPlus: g.All(t => t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null)))
             .OrderByDescending(g => g.Total);
     }
 
@@ -38,4 +39,11 @@
         var normalized = TrailingNumberPattern.Replace(name, "").TrimEnd();
         return normalized.Length == 0 ? name : normalized;
     }
+
+    private static string FormatCurrency(string currency) => currency switch
+    {
+        "EUR" => "€",
+        "RUB" => "₽",
+        _ => currency
+    };
 }

@@ -7,6 +7,7 @@
 @inject NavigationManager NavigationManager
 
 <div class="sync-status">
+    <StatusBar/>
     <span class="sync-status__text sync-status__username">@Username</span>
     <div class="sync-status__row">
         @if (IsAdmin)
@@ -102,6 +103,7 @@
 
         SyncStatusState.IsSyncing = true;
         _isSyncing = true;
+        StateHasChanged();
 
         try
         {
@@ -112,6 +114,7 @@
         {
             SyncStatusState.IsSyncing = false;
             _isSyncing = false;
+            StateHasChanged();
         }
     }
 
@@ -124,6 +127,7 @@
 
         SyncStatusState.IsSyncing = true;
         _isRefreshingToken = true;
+        StateHasChanged();
 
         string? authUrl;
         try
@@ -134,6 +138,7 @@
         {
             SyncStatusState.IsSyncing = false;
             _isRefreshingToken = false;
+            StateHasChanged();
         }
 
         if (authUrl is not null)
