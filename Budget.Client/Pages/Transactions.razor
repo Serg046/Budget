@@ -11,7 +11,7 @@
 @inject SyncStatusState SyncStatusState
 @inject IJSRuntime JS
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Transactions</PageTitle>
 
 <div class="month-picker">
     <button class="month-picker__nav" @onclick="PreviousMonth" aria-label="Previous month">&#8249;</button>
@@ -30,7 +30,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var t in Transactions ?? [])
+                @foreach (var t in TransactionList ?? [])
                 {
                     <tr @onclick="() => ShowDetails(t)">
                         <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
@@ -43,8 +43,8 @@
     </div>
 
     <div class="page-columns__sidebar">
-        <CreditorSummary Transactions="Transactions"/>
-        <CreditorSummary Transactions="Transactions"/>
+        <CreditorSummary Transactions="TransactionList"/>
+        <CreditorSummary Transactions="TransactionList"/>
     </div>
 </div>
 
@@ -79,7 +79,7 @@
     public DateOnly Month { get; set; }
 
     [PersistentState]
-    public List<TransactionDocument>? Transactions { get; set; }
+    public List<TransactionDocument>? TransactionList { get; set; }
 
     private string? SelectedTransactionJson { get; set; }
 
@@ -87,7 +87,7 @@
     {
         SyncStatusState.SyncCompleted += OnSyncCompleted;
 
-        if (Transactions is not null)
+        if (TransactionList is not null)
         {
             return;
         }
@@ -125,7 +125,7 @@
     private async Task LoadTransactions()
     {
         var to = Month.AddMonths(1).AddDays(-1);
-        Transactions = await TransactionRepository.Get(Month, to);
+        TransactionList = await TransactionRepository.Get(Month, to);
     }
 
     private void ShowDetails(TransactionDocument transaction)
