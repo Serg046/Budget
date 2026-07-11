@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Budget.Client.Models;
 using Budget.Client.Repositories;
 using Budget.Client.Services;
 using Budget.Components;
@@ -25,6 +26,7 @@ builder.Services.AddSingleton<ISettingsRepository, SettingsRepository>();
 builder.Services.AddSingleton<TransactionRepository>();
 builder.Services.AddSingleton<ITransactionRepository>(sp => sp.GetRequiredService<TransactionRepository>());
 builder.Services.AddSingleton<ISyncStatusRepository, SyncStatusRepository>();
+builder.Services.AddSingleton<IMerchantMappingRepository, MerchantMappingRepository>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddScoped<SyncStatusState>();
 builder.Services.AddHttpContextAccessor();
@@ -75,6 +77,22 @@ app.UseAntiforgery();
 
 app.MapGet("/api/transactions", async (DateOnly from, DateOnly to, ITransactionRepository repo) =>
     await repo.Get(from, to));
+app.MapGet("/api/merchants", async (ITransactionRepository repo) =>
+    await repo.GetDistinctMerchantNames());
+app.MapGet("/api/merchant-mappings", async (IMerchantMappingRepository repo) =>
+    await repo.GetAll());
+app.MapPost("/api/merchant-mappings", async (MerchantMapping mapping, IMerchantMappingRepository repo) =>
+{
+    try
+    {
+        await repo.SetMapping(mapping.MappedFrom, mapping.MappedTo);
+        return Results.Ok();
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+});
 app.MapGet("/api/sync-status/username", async (ISyncStatusRepository repo) =>
     await repo.GetUsername());
 app.MapGet("/api/sync-status/is-admin", async (ISyncStatusRepository repo) =>

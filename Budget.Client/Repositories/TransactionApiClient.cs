@@ -14,4 +14,9 @@ public class TransactionApiClient(HttpClient http) : ITransactionRepository
         return await http.GetFromJsonAsync<List<TransactionDocument>>(
             $"api/transactions?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}") ?? [];
     }
+
+    public async Task<List<string>> GetDistinctMerchantNames()
+    {
+        return await http.GetFromJsonAsync<List<string>>("api/merchants") ?? [];
+    }
 }

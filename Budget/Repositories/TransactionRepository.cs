@@ -1,5 +1,6 @@
 using Budget.Client.Models;
 using Budget.Client.Repositories;
+using Budget.Client.Services;
 using MongoDB.Driver;
 
 namespace Budget.Repositories;
@@ -28,6 +29,19 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
         return transactions
             .OrderBy(t => t.EntryReference is null ? 0 : 1)
             .ThenByDescending(t => t.BookingDate)
+            .ToList();
+    }
+
+    public async Task<List<string>> GetDistinctMerchantNames()
+    {
+        var filter = Builders<TransactionDocument>.Filter.Ne(t => t.Creditor!.Name, null);
+        var rawNames = await _collection.Distinct(t => t.Creditor!.Name, filter).ToListAsync();
+
+        return rawNames
+            .Where(name => name is not null)
+            .Select(name => MerchantNameNormalizer.Normalize(name!))
+            .Distinct()
+            .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
     }
 

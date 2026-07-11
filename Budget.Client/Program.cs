@@ -7,6 +7,7 @@ var builder = WebAssemblyHostBuilder.CreateDefault(args);
 builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
 builder.Services.AddScoped<ITransactionRepository, TransactionApiClient>();
 builder.Services.AddScoped<ISyncStatusRepository, SyncStatusApiClient>();
+builder.Services.AddScoped<IMerchantMappingRepository, MerchantMappingApiClient>();
 builder.Services.AddScoped<SyncStatusState>();
 
 await builder.Build().RunAsync();

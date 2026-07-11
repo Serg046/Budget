@@ -1,0 +1,140 @@
+@page "/merchants"
+@rendermode InteractiveAuto
+@implements IAsyncDisposable
+@using Budget.Client.Models
+@using Budget.Client.Repositories
+@inject ITransactionRepository TransactionRepository
+@inject IMerchantMappingRepository MerchantMappingRepository
+@inject IJSRuntime JS
+
+<PageTitle>Merchants</PageTitle>
+
+<ul class="merchants-list" @ref="_listRef">
+    @foreach (var name in MerchantNames ?? [])
+    {
+        <li class="merchants-list__item @(_mappings.ContainsKey(name) ? "merchants-list__item--mapped" : "") @(name == _selectedName ? "merchants-list__item--selected" : "")"
+            @onclick="() => SelectRow(name)">
+            @name
+            @if (_mappings.TryGetValue(name, out var mappedTo))
+            {
+                <span class="merchants-list__badge" title="Mapped to @mappedTo">Mapped</span>
+            }
+        </li>
+
+        @if (name == _selectedName)
+        {
+            <li class="merchants-list__picker">
+                <input class="merchants-list__picker-input"
+                       placeholder="Type to filter merchants..."
+                       value="@_filterText"
+                       @oninput="e => _filterText = (string?)e.Value ?? string.Empty"/>
+                <ul class="merchants-list__picker-options">
+                    @foreach (var candidate in GetFilteredCandidates())
+                    {
+                        <li @onclick="() => ConfirmMapping(candidate)">@candidate</li>
+                    }
+                </ul>
+            </li>
+        }
+    }
+</ul>
+
+@code {
+    [PersistentState]
+    public List<string>? MerchantNames { get; set; }
+
+    [PersistentState]
+    public List<MerchantMapping>? Mappings { get; set; }
+
+    private Dictionary<string, string> _mappings = new();
+    private string? _selectedName;
+    private string _filterText = string.Empty;
+    private ElementReference _listRef;
+    private IJSObjectReference? _clickOutsideModule;
+    private DotNetObjectReference<Merchants>? _dotNetRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (MerchantNames is not null)
+        {
+            _mappings = (Mappings ?? []).ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+            return;
+        }
+
+        MerchantNames = await TransactionRepository.GetDistinctMerchantNames();
+        Mappings = await MerchantMappingRepository.GetAll();
+        _mappings = Mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _clickOutsideModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clickOutside.js");
+            await _clickOutsideModule.InvokeVoidAsync("register", _dotNetRef, _listRef);
+        }
+    }
+
+    private void SelectRow(string name)
+    {
+        _selectedName = _selectedName == name ? null : name;
+        _filterText = string.Empty;
+    }
+
+    [JSInvokable]
+    public void OnClickOutside()
+    {
+        if (_selectedName is not null)
+        {
+            _selectedName = null;
+            _filterText = string.Empty;
+            StateHasChanged();
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_clickOutsideModule is not null)
+        {
+            try
+            {
+                await _clickOutsideModule.InvokeVoidAsync("unregister", _listRef);
+                await _clickOutsideModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is already tearing down (e.g. InteractiveAuto handing off to WebAssembly) - nothing to clean up.
+            }
+        }
+
+        _dotNetRef?.Dispose();
+    }
+
+    private IEnumerable<string> GetFilteredCandidates()
+    {
+        if (MerchantNames is null || _selectedName is null)
+        {
+            return [];
+        }
+
+        return MerchantNames
+            .Where(name => name != _selectedName)
+            .Where(name => _filterText.Length == 0 || name.Contains(_filterText, StringComparison.OrdinalIgnoreCase))
+            .Take(15);
+    }
+
+    private async Task ConfirmMapping(string mappedTo)
+    {
+        if (_selectedName is null)
+        {
+            return;
+        }
+
+        await MerchantMappingRepository.SetMapping(_selectedName, mappedTo);
+        _mappings[_selectedName] = mappedTo;
+
+        _selectedName = null;
+        _filterText = string.Empty;
+    }
+}
