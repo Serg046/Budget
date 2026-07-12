@@ -77,6 +77,10 @@ table tbody tr:hover {
     background-color: #f3eaf7;
 }
 
+table tbody tr.row--highlighted {
+    background-color: #e6d5ee;
+}
+
 .modal-backdrop {
     position: fixed;
     inset: 0;

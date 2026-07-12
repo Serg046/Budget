@@ -1,4 +1,4 @@
-.creditor-summary {
+.group-summary {
     flex: 1;
     min-height: 0;
     display: flex;
@@ -9,7 +9,7 @@
     padding: 1rem 1.25rem;
 }
 
-.creditor-summary__title {
+.group-summary__title {
     flex-shrink: 0;
     margin: 0 0 0.5rem;
     font-size: 0.95rem;
@@ -17,7 +17,7 @@
     color: #3a0647;
 }
 
-.creditor-summary__list {
+.group-summary__list {
     list-style: none;
     margin: 0;
     padding: 0;
@@ -25,7 +25,7 @@
     overflow-y: auto;
 }
 
-.creditor-summary__item {
+.group-summary__item {
     display: flex;
     align-items: baseline;
     justify-content: space-between;
@@ -37,25 +37,25 @@
     cursor: pointer;
 }
 
-.creditor-summary__item:hover {
+.group-summary__item:hover {
     background-color: #f3eaf7;
 }
 
-.creditor-summary__item--selected {
+.group-summary__item--selected {
     background-color: #e6d5ee;
 }
 
-.creditor-summary__item + .creditor-summary__item {
+.group-summary__item + .group-summary__item {
     border-top: 1px solid #f0f0f0;
 }
 
-.creditor-summary__name {
+.group-summary__name {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.creditor-summary__total {
+.group-summary__total {
     flex-shrink: 0;
     font-weight: 600;
     color: #3a0647;

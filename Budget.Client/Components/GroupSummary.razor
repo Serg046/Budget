@@ -3,15 +3,16 @@
 @using Budget.Client.Repositories
 @using Budget.Client.Services
 @inject IMerchantMappingRepository MerchantMappingRepository
+@inject IMerchantGroupRepository MerchantGroupRepository
 
-<div class="creditor-summary">
-    <h2 class="creditor-summary__title">By Merchant</h2>
-    <ul class="creditor-summary__list">
-        @foreach (var creditor in GetCreditorTotals())
+<div class="group-summary">
+    <h2 class="group-summary__title">By Group</h2>
+    <ul class="group-summary__list">
+        @foreach (var group in GetGroupTotals())
         {
-            <li class="creditor-summary__item @(SelectedName == creditor.Name ? "creditor-summary__item--selected" : "")" @onclick="() => Select(creditor.Name)">
-                <span class="creditor-summary__name">@creditor.Name</span>
-                <span class="creditor-summary__total">@(creditor.ShowPlus ? "+" : "")@FormatCurrency(creditor.Currency)@creditor.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
+            <li class="group-summary__item @(SelectedName == group.Name ? "group-summary__item--selected" : "")" @onclick="() => Select(group.Name)">
+                <span class="group-summary__name">@group.Name</span>
+                <span class="group-summary__total">@(group.ShowPlus ? "+" : "")@FormatCurrency(group.Currency)@group.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
             </li>
         }
     </ul>
@@ -28,18 +29,22 @@
     public EventCallback<string?> OnSelect { get; set; }
 
     private Dictionary<string, string> _mappings = new();
+    private Dictionary<string, string> _groupAssignments = new();
 
     protected override async Task OnInitializedAsync()
     {
         var mappings = await MerchantMappingRepository.GetAll();
         _mappings = mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+
+        var assignments = await MerchantGroupRepository.GetAssignments();
+        _groupAssignments = assignments.ToDictionary(a => a.MerchantName, a => a.GroupName);
     }
 
-    private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetCreditorTotals()
+    private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetGroupTotals()
     {
         return (Transactions ?? [])
             .Where(t => t.Creditor?.Name is not null)
-            .GroupBy(t => MerchantResolution.ResolveCanonicalName(t.Creditor!.Name!, _mappings))
+            .GroupBy(t => MerchantResolution.ResolveGroupName(t.Creditor!.Name!, _mappings, _groupAssignments))
             .Select(g => (
                 Name: g.Key,
                 Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),

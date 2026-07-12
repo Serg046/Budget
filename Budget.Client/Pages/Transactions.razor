@@ -6,8 +6,10 @@
 @using Budget.Client.Models
 @using Budget.Client.Repositories
 @using Budget.Client.Services
-@implements IDisposable
+@implements IAsyncDisposable
 @inject ITransactionRepository TransactionRepository
+@inject IMerchantMappingRepository MerchantMappingRepository
+@inject IMerchantGroupRepository MerchantGroupRepository
 @inject SyncStatusState SyncStatusState
 @inject IJSRuntime JS
 
@@ -32,7 +34,7 @@
             <tbody>
                 @foreach (var t in TransactionList ?? [])
                 {
-                    <tr @onclick="() => ShowDetails(t)">
+                    <tr class="@(IsHighlighted(t) ? "row--highlighted" : "")" @onclick="() => ShowDetails(t)">
                         <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
                         <td>@(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null ? "+" : "")@FormatCurrency(t.TransactionAmount.Currency)@FormatAmount(t.TransactionAmount.Value)</td>
                         <td>@t.Creditor?.Name</td>
@@ -42,9 +44,9 @@
         </table>
     </div>
 
-    <div class="page-columns__sidebar">
-        <CreditorSummary Transactions="TransactionList"/>
-        <CreditorSummary Transactions="TransactionList"/>
+    <div class="page-columns__sidebar" @ref="_sidebarRef">
+        <GroupSummary Transactions="TransactionList" SelectedName="_selectedGroup" OnSelect="SelectGroup"/>
+        <CreditorSummary Transactions="TransactionList" SelectedName="_selectedMerchant" OnSelect="SelectMerchant"/>
     </div>
 </div>
 
@@ -81,7 +83,20 @@
     [PersistentState]
     public List<TransactionDocument>? TransactionList { get; set; }
 
+    [PersistentState]
+    public List<MerchantMapping>? Mappings { get; set; }
+
+    [PersistentState]
+    public List<MerchantGroupAssignment>? GroupAssignments { get; set; }
+
     private string? SelectedTransactionJson { get; set; }
+    private string? _selectedMerchant;
+    private string? _selectedGroup;
+    private Dictionary<string, string> _mappings = new();
+    private Dictionary<string, string> _groupAssignments = new();
+    private ElementReference _sidebarRef;
+    private IJSObjectReference? _clickOutsideModule;
+    private DotNetObjectReference<Transactions>? _dotNetRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -89,11 +104,70 @@
 
         if (TransactionList is not null)
         {
+            _mappings = (Mappings ?? []).ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+            _groupAssignments = (GroupAssignments ?? []).ToDictionary(a => a.MerchantName, a => a.GroupName);
             return;
         }
 
         Month = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+        Mappings = await MerchantMappingRepository.GetAll();
+        GroupAssignments = await MerchantGroupRepository.GetAssignments();
+        _mappings = Mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+        _groupAssignments = GroupAssignments.ToDictionary(a => a.MerchantName, a => a.GroupName);
         await LoadTransactions();
+    }
+
+    private void SelectMerchant(string? name)
+    {
+        _selectedMerchant = name;
+        _selectedGroup = null;
+    }
+
+    private void SelectGroup(string? name)
+    {
+        _selectedGroup = name;
+        _selectedMerchant = null;
+    }
+
+    private bool IsHighlighted(TransactionDocument t)
+    {
+        if (t.Creditor?.Name is null)
+        {
+            return false;
+        }
+
+        if (_selectedMerchant is not null)
+        {
+            return MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings) == _selectedMerchant;
+        }
+
+        if (_selectedGroup is not null)
+        {
+            return MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments) == _selectedGroup;
+        }
+
+        return false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetRef = DotNetObjectReference.Create(this);
+            _clickOutsideModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clickOutside.js");
+            await _clickOutsideModule.InvokeVoidAsync("register", _dotNetRef, _sidebarRef);
+        }
+    }
+
+    [JSInvokable]
+    public void OnClickOutside()
+    {
+        if (_selectedMerchant is not null || _selectedGroup is not null)
+        {
+            _selectedMerchant = null;
+            _selectedGroup = null;
+            StateHasChanged();
+        }
     }
 
     private void OnSyncCompleted()
@@ -105,9 +179,24 @@
         });
     }
 
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         SyncStatusState.SyncCompleted -= OnSyncCompleted;
+
+        if (_clickOutsideModule is not null)
+        {
+            try
+            {
+                await _clickOutsideModule.InvokeVoidAsync("unregister", _sidebarRef);
+                await _clickOutsideModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is already tearing down (e.g. InteractiveAuto handing off to WebAssembly) - nothing to clean up.
+            }
+        }
+
+        _dotNetRef?.Dispose();
     }
 
     private async Task PreviousMonth()
