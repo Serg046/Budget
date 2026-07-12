@@ -6,6 +6,7 @@
 
 main {
     flex: 1;
+    min-width: 0;
 }
 
 .sidebar {
@@ -37,6 +38,8 @@ article {
     display: flex;
     flex-direction: column;
     height: calc(100vh - 3.5rem);
+    min-width: 0;
+    overflow-x: hidden;
 }
 
 @media (min-width: 641px) {

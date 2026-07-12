@@ -9,4 +9,6 @@ public interface ITransactionRepository
     Task<List<TransactionDocument>> Get(DateOnly from, DateOnly to);
 
     Task<List<string>> GetDistinctMerchantNames();
+
+    Task<Dictionary<string, decimal>> GetTotalSpentByMerchant();
 }

@@ -29,6 +29,7 @@ builder.Services.AddSingleton<ITransactionRepository>(sp => sp.GetRequiredServic
 builder.Services.AddSingleton<ISyncStatusRepository, SyncStatusRepository>();
 builder.Services.AddSingleton<IMerchantMappingRepository, MerchantMappingRepository>();
 builder.Services.AddSingleton<IMerchantNameExclusionRepository, MerchantNameExclusionRepository>();
+builder.Services.AddSingleton<IMerchantGroupRepository, MerchantGroupRepository>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddScoped<SyncStatusState>();
 builder.Services.AddHttpContextAccessor();
@@ -81,6 +82,8 @@ app.MapGet("/api/transactions", async (DateOnly from, DateOnly to, ITransactionR
     await repo.Get(from, to));
 app.MapGet("/api/merchants", async (ITransactionRepository repo) =>
     await repo.GetDistinctMerchantNames());
+app.MapGet("/api/merchant-totals", async (ITransactionRepository repo) =>
+    await repo.GetTotalSpentByMerchant());
 app.MapGet("/api/merchant-mappings", async (IMerchantMappingRepository repo) =>
     await repo.GetAll());
 app.MapPost("/api/merchant-mappings", async (MerchantMapping mapping, IMerchantMappingRepository repo) =>
@@ -110,6 +113,44 @@ app.MapPost("/api/merchant-name-exclusions", async ([FromBody] string word, IMer
 app.MapPost("/api/merchant-name-exclusions/remove", async ([FromBody] string word, IMerchantNameExclusionRepository repo) =>
 {
     await repo.Remove(word);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapGet("/api/merchant-groups", async (IMerchantGroupRepository repo) =>
+    await repo.GetGroups());
+app.MapPost("/api/merchant-groups", async ([FromBody] string name, IMerchantGroupRepository repo) =>
+{
+    try
+    {
+        await repo.AddGroup(name);
+        return Results.Ok();
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapPost("/api/merchant-groups/rename", async (RenameGroupRequest request, IMerchantGroupRepository repo) =>
+{
+    try
+    {
+        await repo.RenameGroup(request.OldName, request.NewName);
+        return Results.Ok();
+    }
+    catch (ArgumentException ex)
+    {
+        return Results.BadRequest(ex.Message);
+    }
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapPost("/api/merchant-groups/remove", async ([FromBody] string name, IMerchantGroupRepository repo) =>
+{
+    await repo.RemoveGroup(name);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapGet("/api/merchant-group-assignments", async (IMerchantGroupRepository repo) =>
+    await repo.GetAssignments());
+app.MapPost("/api/merchant-group-assignments", async (MerchantGroupAssignment assignment, IMerchantGroupRepository repo) =>
+{
+    await repo.SetAssignment(assignment.MerchantName, assignment.GroupName);
     return Results.Ok();
 }).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
 app.MapGet("/api/sync-status/username", async (ISyncStatusRepository repo) =>

@@ -9,6 +9,7 @@ builder.Services.AddScoped<ITransactionRepository, TransactionApiClient>();
 builder.Services.AddScoped<ISyncStatusRepository, SyncStatusApiClient>();
 builder.Services.AddScoped<IMerchantMappingRepository, MerchantMappingApiClient>();
 builder.Services.AddScoped<IMerchantNameExclusionRepository, MerchantNameExclusionApiClient>();
+builder.Services.AddScoped<IMerchantGroupRepository, MerchantGroupApiClient>();
 builder.Services.AddScoped<SyncStatusState>();
 
 await builder.Build().RunAsync();

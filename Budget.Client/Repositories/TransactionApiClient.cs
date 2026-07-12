@@ -19,4 +19,9 @@ public class TransactionApiClient(HttpClient http) : ITransactionRepository
     {
         return await http.GetFromJsonAsync<List<string>>("api/merchants") ?? [];
     }
+
+    public async Task<Dictionary<string, decimal>> GetTotalSpentByMerchant()
+    {
+        return await http.GetFromJsonAsync<Dictionary<string, decimal>>("api/merchant-totals") ?? [];
+    }
 }

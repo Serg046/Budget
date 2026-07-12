@@ -1,3 +1,4 @@
+using System.Globalization;
 using Budget.Client.Models;
 using Budget.Client.Repositories;
 using Budget.Client.Services;
@@ -43,6 +44,26 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
             .Distinct()
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
+    }
+
+    public async Task<Dictionary<string, decimal>> GetTotalSpentByMerchant()
+    {
+        var filter = Builders<TransactionDocument>.Filter.Eq(t => t.CreditDebitIndicator, "DBIT") &
+                     Builders<TransactionDocument>.Filter.Ne(t => t.Creditor!.Name, null);
+
+        var spends = await _collection.Find(filter)
+            .Project(t => new { Name = t.Creditor!.Name!, t.TransactionAmount.Value })
+            .ToListAsync();
+
+        var totals = new Dictionary<string, decimal>();
+        foreach (var spend in spends)
+        {
+            var normalized = MerchantNameNormalizer.Normalize(spend.Name);
+            var amount = decimal.Parse(spend.Value, CultureInfo.InvariantCulture);
+            totals[normalized] = totals.GetValueOrDefault(normalized) + amount;
+        }
+
+        return totals;
     }
 
     public async Task<HashSet<string>> GetExistingEntryReferences(IEnumerable<string> entryReferences)

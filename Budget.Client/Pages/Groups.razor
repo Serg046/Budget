@@ -1,0 +1,317 @@
+@page "/groups"
+@rendermode InteractiveAuto
+@implements IAsyncDisposable
+@using System.Globalization
+@using Budget.Client.Models
+@using Budget.Client.Repositories
+@inject ITransactionRepository TransactionRepository
+@inject IMerchantMappingRepository MerchantMappingRepository
+@inject IMerchantGroupRepository MerchantGroupRepository
+@inject ISyncStatusRepository SyncStatusRepository
+@inject IJSRuntime JS
+
+<PageTitle>Groups</PageTitle>
+
+<div class="groups-board" @ref="_boardRef">
+    <div class="groups-board__column" @ondragover="OnDragOver" @ondragover:preventDefault="true" @ondrop="() => Drop(IMerchantGroupRepository.OthersGroupName)">
+        <div class="groups-board__column-header">
+            <h2>@IMerchantGroupRepository.OthersGroupName</h2>
+        </div>
+        <ul class="groups-board__list">
+            @foreach (var name in GetMerchantsInGroup(IMerchantGroupRepository.OthersGroupName))
+            {
+                <li class="groups-board__item" draggable="@(_isAdmin ? "true" : "false")" @ondragstart="() => DragStart(name)">
+                    <span class="groups-board__item-name">@name</span>
+                    <span class="groups-board__item-total">€@_effectiveTotals.GetValueOrDefault(name, 0m).ToString("0.00", CultureInfo.InvariantCulture)</span>
+                </li>
+            }
+        </ul>
+    </div>
+
+    @foreach (var group in _groups)
+    {
+        <div class="groups-board__column" @ondragover="OnDragOver" @ondragover:preventDefault="true" @ondrop="() => Drop(group)">
+            <div class="groups-board__column-header">
+                @if (_editingGroup == group)
+                {
+                    <input class="groups-board__rename-input" value="@_editGroupNameValue"
+                           @oninput="e => _editGroupNameValue = (string?)e.Value ?? string.Empty"
+                           @onkeydown="e => OnRenameKeyDown(e, group)"
+                           @onblur="() => ConfirmRename(group)"/>
+                }
+                else
+                {
+                    <h2 class="@(_isAdmin ? "groups-board__column-title--editable" : "")" @onclick="() => StartRename(group)">@group</h2>
+                }
+                @if (_isAdmin)
+                {
+                    <button class="groups-board__remove-group" @onclick="() => RemoveGroup(group)" aria-label="Remove group @group">&times;</button>
+                }
+            </div>
+            @if (_editingGroup == group && _renameError is not null)
+            {
+                <div class="groups-board__rename-error">@_renameError</div>
+            }
+            <ul class="groups-board__list">
+                @foreach (var name in GetMerchantsInGroup(group))
+                {
+                    <li class="groups-board__item" draggable="@(_isAdmin ? "true" : "false")" @ondragstart="() => DragStart(name)">
+                    <span class="groups-board__item-name">@name</span>
+                    <span class="groups-board__item-total">€@_effectiveTotals.GetValueOrDefault(name, 0m).ToString("0.00", CultureInfo.InvariantCulture)</span>
+                </li>
+                }
+            </ul>
+        </div>
+    }
+
+    @if (_isAdmin)
+    {
+        <div class="groups-board__add-column">
+            <input class="groups-board__add-input" placeholder="New group..." value="@_newGroupName"
+                   @oninput="e => _newGroupName = (string?)e.Value ?? string.Empty"
+                   @onkeydown="OnNewGroupKeyDown"/>
+            <button class="groups-board__add-button" @onclick="AddGroup">Add group</button>
+        </div>
+    }
+</div>
+
+@code {
+    [PersistentState]
+    public List<string>? MerchantNames { get; set; }
+
+    [PersistentState]
+    public List<MerchantMapping>? Mappings { get; set; }
+
+    [PersistentState]
+    public List<string>? GroupNames { get; set; }
+
+    [PersistentState]
+    public List<MerchantGroupAssignment>? Assignments { get; set; }
+
+    [PersistentState]
+    public bool? IsAdmin { get; set; }
+
+    [PersistentState]
+    public Dictionary<string, decimal>? MerchantTotals { get; set; }
+
+    private bool _isAdmin;
+    private List<string> _canonicalMerchants = [];
+    private List<string> _groups = [];
+    private Dictionary<string, string> _assignments = new();
+    private Dictionary<string, decimal> _effectiveTotals = new();
+    private string? _draggedMerchant;
+    private string _newGroupName = string.Empty;
+    private string? _editingGroup;
+    private string _editGroupNameValue = string.Empty;
+    private string? _renameError;
+    private ElementReference _boardRef;
+    private IJSObjectReference? _dragScrollModule;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (MerchantNames is not null)
+        {
+            var mappings = (Mappings ?? []).ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+            _canonicalMerchants = MerchantNames.Where(name => !mappings.ContainsKey(name)).ToList();
+            _groups = GroupNames ?? [];
+            _assignments = (Assignments ?? []).ToDictionary(a => a.MerchantName, a => a.GroupName);
+            _isAdmin = IsAdmin ?? false;
+            RecomputeEffectiveTotals(mappings);
+            return;
+        }
+
+        MerchantNames = await TransactionRepository.GetDistinctMerchantNames();
+        Mappings = await MerchantMappingRepository.GetAll();
+        GroupNames = await MerchantGroupRepository.GetGroups();
+        Assignments = await MerchantGroupRepository.GetAssignments();
+        IsAdmin = await SyncStatusRepository.IsAdmin();
+        MerchantTotals = await TransactionRepository.GetTotalSpentByMerchant();
+
+        var mappedFrom = Mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+        _canonicalMerchants = MerchantNames.Where(name => !mappedFrom.ContainsKey(name)).ToList();
+        _groups = GroupNames;
+        _assignments = Assignments.ToDictionary(a => a.MerchantName, a => a.GroupName);
+        _isAdmin = IsAdmin.Value;
+        RecomputeEffectiveTotals(mappedFrom);
+    }
+
+    private void RecomputeEffectiveTotals(Dictionary<string, string> mappings)
+    {
+        var totals = MerchantTotals ?? [];
+
+        _effectiveTotals = _canonicalMerchants.ToDictionary(name => name, name => totals.GetValueOrDefault(name, 0m));
+
+        foreach (var (aliasFrom, aliasTo) in mappings)
+        {
+            if (_effectiveTotals.ContainsKey(aliasTo))
+            {
+                _effectiveTotals[aliasTo] += totals.GetValueOrDefault(aliasFrom, 0m);
+            }
+        }
+    }
+
+    private IEnumerable<string> GetMerchantsInGroup(string groupName)
+    {
+        return _canonicalMerchants
+            .Where(name => _assignments.GetValueOrDefault(name, IMerchantGroupRepository.OthersGroupName) == groupName)
+            .OrderByDescending(name => _effectiveTotals.GetValueOrDefault(name, 0m));
+    }
+
+    private void DragStart(string name)
+    {
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        _draggedMerchant = name;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dragScrollModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/dragScroll.js");
+        }
+    }
+
+    private async Task OnDragOver(DragEventArgs e)
+    {
+        if (_dragScrollModule is not null)
+        {
+            await _dragScrollModule.InvokeVoidAsync("checkEdgeScroll", _boardRef, e.ClientX);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_dragScrollModule is not null)
+        {
+            try
+            {
+                await _dragScrollModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The circuit is already tearing down (e.g. InteractiveAuto handing off to WebAssembly) - nothing to clean up.
+            }
+        }
+    }
+
+    private async Task Drop(string groupName)
+    {
+        if (!_isAdmin || _draggedMerchant is null)
+        {
+            return;
+        }
+
+        await MerchantGroupRepository.SetAssignment(_draggedMerchant, groupName);
+        _assignments[_draggedMerchant] = groupName;
+        _draggedMerchant = null;
+    }
+
+    private async Task AddGroup()
+    {
+        var name = _newGroupName.Trim();
+        if (name.Length == 0 || name == IMerchantGroupRepository.OthersGroupName || _groups.Contains(name, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        await MerchantGroupRepository.AddGroup(name);
+        _groups.Add(name);
+        _newGroupName = string.Empty;
+    }
+
+    private async Task RemoveGroup(string name)
+    {
+        await MerchantGroupRepository.RemoveGroup(name);
+        _groups.Remove(name);
+
+        foreach (var merchant in _assignments.Where(kv => kv.Value == name).Select(kv => kv.Key).ToList())
+        {
+            _assignments.Remove(merchant);
+        }
+    }
+
+    private async Task OnNewGroupKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddGroup();
+        }
+    }
+
+    private void StartRename(string group)
+    {
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        _editingGroup = group;
+        _editGroupNameValue = group;
+        _renameError = null;
+    }
+
+    private async Task OnRenameKeyDown(KeyboardEventArgs e, string originalName)
+    {
+        if (e.Key == "Enter")
+        {
+            await ConfirmRename(originalName);
+        }
+        else if (e.Key == "Escape")
+        {
+            _editingGroup = null;
+            _renameError = null;
+        }
+    }
+
+    private async Task ConfirmRename(string originalName)
+    {
+        if (_editingGroup != originalName)
+        {
+            return;
+        }
+
+        var newName = _editGroupNameValue.Trim();
+
+        if (newName.Length == 0 || newName == originalName)
+        {
+            _editingGroup = null;
+            _renameError = null;
+            return;
+        }
+
+        if (newName == IMerchantGroupRepository.OthersGroupName ||
+            _groups.Contains(newName, StringComparer.OrdinalIgnoreCase))
+        {
+            _renameError = $"A group named '{newName}' already exists.";
+            return;
+        }
+
+        try
+        {
+            await MerchantGroupRepository.RenameGroup(originalName, newName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _renameError = ex.Message;
+            return;
+        }
+
+        var index = _groups.IndexOf(originalName);
+        if (index >= 0)
+        {
+            _groups[index] = newName;
+        }
+
+        foreach (var merchant in _assignments.Where(kv => kv.Value == originalName).Select(kv => kv.Key).ToList())
+        {
+            _assignments[merchant] = newName;
+        }
+
+        _editingGroup = null;
+        _renameError = null;
+    }
+}
