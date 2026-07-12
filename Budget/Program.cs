@@ -11,6 +11,7 @@ using Budget.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,6 +28,7 @@ builder.Services.AddSingleton<TransactionRepository>();
 builder.Services.AddSingleton<ITransactionRepository>(sp => sp.GetRequiredService<TransactionRepository>());
 builder.Services.AddSingleton<ISyncStatusRepository, SyncStatusRepository>();
 builder.Services.AddSingleton<IMerchantMappingRepository, MerchantMappingRepository>();
+builder.Services.AddSingleton<IMerchantNameExclusionRepository, MerchantNameExclusionRepository>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddScoped<SyncStatusState>();
 builder.Services.AddHttpContextAccessor();
@@ -92,7 +94,24 @@ app.MapPost("/api/merchant-mappings", async (MerchantMapping mapping, IMerchantM
     {
         return Results.BadRequest(ex.Message);
     }
-});
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapPost("/api/merchant-mappings/remove", async ([FromBody] string mappedFrom, IMerchantMappingRepository repo) =>
+{
+    await repo.RemoveMapping(mappedFrom);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapGet("/api/merchant-name-exclusions", async (IMerchantNameExclusionRepository repo) =>
+    await repo.GetAll());
+app.MapPost("/api/merchant-name-exclusions", async ([FromBody] string word, IMerchantNameExclusionRepository repo) =>
+{
+    await repo.Add(word);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapPost("/api/merchant-name-exclusions/remove", async ([FromBody] string word, IMerchantNameExclusionRepository repo) =>
+{
+    await repo.Remove(word);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
 app.MapGet("/api/sync-status/username", async (ISyncStatusRepository repo) =>
     await repo.GetUsername());
 app.MapGet("/api/sync-status/is-admin", async (ISyncStatusRepository repo) =>

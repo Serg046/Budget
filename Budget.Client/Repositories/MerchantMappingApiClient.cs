@@ -13,6 +13,16 @@ public class MerchantMappingApiClient(HttpClient http) : IMerchantMappingReposit
     public async Task SetMapping(string mappedFrom, string mappedTo)
     {
         var response = await http.PostAsJsonAsync("api/merchant-mappings", new MerchantMapping { MappedFrom = mappedFrom, MappedTo = mappedTo });
+        if (!response.IsSuccessStatusCode)
+        {
+            var message = await response.Content.ReadFromJsonAsync<string>() ?? "Failed to save mapping.";
+            throw new InvalidOperationException(message);
+        }
+    }
+
+    public async Task RemoveMapping(string mappedFrom)
+    {
+        var response = await http.PostAsJsonAsync("api/merchant-mappings/remove", mappedFrom);
         response.EnsureSuccessStatusCode();
     }
 }

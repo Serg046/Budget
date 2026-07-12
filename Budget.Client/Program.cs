@@ -8,6 +8,7 @@ builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(builder.H
 builder.Services.AddScoped<ITransactionRepository, TransactionApiClient>();
 builder.Services.AddScoped<ISyncStatusRepository, SyncStatusApiClient>();
 builder.Services.AddScoped<IMerchantMappingRepository, MerchantMappingApiClient>();
+builder.Services.AddScoped<IMerchantNameExclusionRepository, MerchantNameExclusionApiClient>();
 builder.Services.AddScoped<SyncStatusState>();
 
 await builder.Build().RunAsync();

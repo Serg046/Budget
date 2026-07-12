@@ -1,114 +1,207 @@
 @page "/merchants"
 @rendermode InteractiveAuto
-@implements IAsyncDisposable
+@using System.Text.RegularExpressions
 @using Budget.Client.Models
 @using Budget.Client.Repositories
 @inject ITransactionRepository TransactionRepository
 @inject IMerchantMappingRepository MerchantMappingRepository
-@inject IJSRuntime JS
+@inject IMerchantNameExclusionRepository MerchantNameExclusionRepository
+@inject ISyncStatusRepository SyncStatusRepository
 
 <PageTitle>Merchants</PageTitle>
 
-<ul class="merchants-list" @ref="_listRef">
+<div class="merchants-toolbar">
+    <button class="merchants-toolbar__button" @onclick="OpenExclusionsModal" disabled="@(!_isAdmin)">Ignorings (@_exclusions.Count)</button>
+</div>
+
+<ul class="merchants-list">
     @foreach (var name in MerchantNames ?? [])
     {
-        <li class="merchants-list__item @(_mappings.ContainsKey(name) ? "merchants-list__item--mapped" : "") @(name == _selectedName ? "merchants-list__item--selected" : "")"
-            @onclick="() => SelectRow(name)">
+        <li class="merchants-list__item @(_mappings.ContainsKey(name) ? "merchants-list__item--mapped" : _similarCandidates.ContainsKey(name) ? "merchants-list__item--similar" : "") @(!_isAdmin ? "merchants-list__item--readonly" : "")"
+            @onclick="() => OpenMappingModal(name)">
             @name
             @if (_mappings.TryGetValue(name, out var mappedTo))
             {
                 <span class="merchants-list__badge" title="Mapped to @mappedTo">Mapped</span>
             }
+            else if (_similarCandidates.TryGetValue(name, out var candidates))
+            {
+                <span class="merchants-list__badge merchants-list__badge--similar" title="Might be the same as: @string.Join(", ", candidates)">Similar?</span>
+            }
         </li>
-
-        @if (name == _selectedName)
-        {
-            <li class="merchants-list__picker">
-                <input class="merchants-list__picker-input"
-                       placeholder="Type to filter merchants..."
-                       value="@_filterText"
-                       @oninput="e => _filterText = (string?)e.Value ?? string.Empty"/>
-                <ul class="merchants-list__picker-options">
-                    @foreach (var candidate in GetFilteredCandidates())
-                    {
-                        <li @onclick="() => ConfirmMapping(candidate)">@candidate</li>
-                    }
-                </ul>
-            </li>
-        }
     }
 </ul>
 
+@if (_showExclusionsModal)
+{
+    <div class="modal-backdrop" @onclick="CloseExclusionsModal">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-box__header">
+                <span>Ignorings</span>
+                <button class="modal-box__close" @onclick="CloseExclusionsModal" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="merchants-exclusions__chips">
+                @foreach (var word in _exclusions)
+                {
+                    <span class="merchants-exclusions__chip">
+                        @word
+                        <button class="merchants-exclusions__remove" @onclick="() => RemoveExclusion(word)" aria-label="Remove @word">&times;</button>
+                    </span>
+                }
+            </div>
+            <div class="merchants-exclusions__add-row">
+                <input class="merchants-exclusions__input" placeholder="Add word..." value="@_newExclusionWord"
+                       @oninput="e => _newExclusionWord = (string?)e.Value ?? string.Empty"
+                       @onkeydown="OnExclusionInputKeyDown"/>
+                <button class="merchants-exclusions__add" @onclick="AddExclusion">Add</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (_selectedName is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseModal">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-box__header">
+                <span>Map merchant</span>
+                <button class="modal-box__close" @onclick="CloseModal" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="merchants-modal__mapping">
+                <div class="merchants-modal__fields">
+                    <div class="merchants-modal__field">
+                        <span class="merchants-modal__field-label">Mapped from:</span>
+                        <span class="merchants-modal__field-value">@_selectedName</span>
+                    </div>
+                    <div class="merchants-modal__field">
+                        <span class="merchants-modal__field-label">Mapped to:</span>
+                        <span class="merchants-modal__field-value">@(_mappings.TryGetValue(_selectedName, out var currentMappedTo) ? currentMappedTo : "(not mapped yet)")</span>
+                    </div>
+                </div>
+                @if (_mappings.ContainsKey(_selectedName))
+                {
+                    <button class="merchants-modal__swap" @onclick="SwapMapping" title="Swap Mapped from / Mapped to" aria-label="Swap Mapped from / Mapped to">
+                        <svg viewBox="0 0 200 200" style="transform: rotate(180deg)">
+                            <g transform="translate(0,200) scale(0.1,-0.1)" fill="currentColor" stroke="none">
+                                <path d="M1057 1922 c-13 -14 -17 -38 -17 -95 l0 -76 -37 -6 c-187 -31 -349 -127 -472 -280 -105 -131 -149 -249 -158 -425 -12 -222 52 -393 205 -552 48 -50 116 -108 156 -133 68 -42 190 -88 269 -100 l37 -6 0 -78 c0 -82 14 -111 54 -111 18 0 446 244 504 287 36 27 42 61 15 85 -41 35 -493 288 -515 288 -41 0 -58 -29 -58 -99 l0 -63 -27 6 c-60 14 -160 72 -209 121 -97 97 -149 254 -125 383 27 148 117 271 241 329 36 17 77 33 93 37 l27 6 0 -68 c0 -71 16 -102 52 -102 16 0 490 271 521 298 27 24 21 58 -15 85 -58 43 -489 287 -507 287 -10 0 -25 -8 -34 -18z"/>
+                            </g>
+                        </svg>
+                    </button>
+                }
+            </div>
+
+            @if (_similarCandidates.TryGetValue(_selectedName, out var similarCandidates))
+            {
+                <div class="merchants-modal__similar">
+                    <span class="merchants-modal__similar-label">Similar merchants:</span>
+                    <div class="merchants-modal__similar-list">
+                        @foreach (var candidate in similarCandidates)
+                        {
+                            <button class="merchants-modal__similar-chip" @onclick="() => ConfirmMapping(candidate)">@candidate</button>
+                        }
+                    </div>
+                </div>
+            }
+
+            @if (_mappingError is not null)
+            {
+                <div class="merchants-modal__error">@_mappingError</div>
+            }
+
+            <input class="merchants-modal__search" placeholder="Type to filter merchants..." value="@_filterText"
+                   @oninput="e => _filterText = (string?)e.Value ?? string.Empty"/>
+            <ul class="merchants-modal__options">
+                @foreach (var candidate in GetFilteredCandidates())
+                {
+                    <li @onclick="() => ConfirmMapping(candidate)">@candidate</li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
 @code {
+    private static readonly Regex DigitsOnly = new(@"^\d+$", RegexOptions.Compiled);
+
     [PersistentState]
     public List<string>? MerchantNames { get; set; }
 
     [PersistentState]
     public List<MerchantMapping>? Mappings { get; set; }
 
+    [PersistentState]
+    public List<string>? Exclusions { get; set; }
+
+    [PersistentState]
+    public bool? IsAdmin { get; set; }
+
+    private bool _isAdmin;
     private Dictionary<string, string> _mappings = new();
+    private List<string> _exclusions = [];
+    private Dictionary<string, List<string>> _similarCandidates = new();
     private string? _selectedName;
     private string _filterText = string.Empty;
-    private ElementReference _listRef;
-    private IJSObjectReference? _clickOutsideModule;
-    private DotNetObjectReference<Merchants>? _dotNetRef;
+    private string _newExclusionWord = string.Empty;
+    private string? _mappingError;
+    private bool _showExclusionsModal;
 
     protected override async Task OnInitializedAsync()
     {
         if (MerchantNames is not null)
         {
             _mappings = (Mappings ?? []).ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+            _exclusions = Exclusions ?? [];
+            _isAdmin = IsAdmin ?? false;
+            RecomputeSimilarGroups();
             return;
         }
 
         MerchantNames = await TransactionRepository.GetDistinctMerchantNames();
         Mappings = await MerchantMappingRepository.GetAll();
+        Exclusions = await MerchantNameExclusionRepository.GetAll();
+        IsAdmin = await SyncStatusRepository.IsAdmin();
+
         _mappings = Mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+        _exclusions = Exclusions;
+        _isAdmin = IsAdmin.Value;
+        RecomputeSimilarGroups();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private void OpenMappingModal(string name)
     {
-        if (firstRender)
+        if (!_isAdmin)
         {
-            _dotNetRef = DotNetObjectReference.Create(this);
-            _clickOutsideModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clickOutside.js");
-            await _clickOutsideModule.InvokeVoidAsync("register", _dotNetRef, _listRef);
+            return;
         }
-    }
 
-    private void SelectRow(string name)
-    {
-        _selectedName = _selectedName == name ? null : name;
+        _selectedName = name;
         _filterText = string.Empty;
+        _mappingError = null;
     }
 
-    [JSInvokable]
-    public void OnClickOutside()
+    private void CloseModal()
     {
-        if (_selectedName is not null)
-        {
-            _selectedName = null;
-            _filterText = string.Empty;
-            StateHasChanged();
-        }
+        _selectedName = null;
+        _filterText = string.Empty;
+        _mappingError = null;
     }
 
-    public async ValueTask DisposeAsync()
+    private void OpenExclusionsModal()
     {
-        if (_clickOutsideModule is not null)
+        if (!_isAdmin)
         {
-            try
-            {
-                await _clickOutsideModule.InvokeVoidAsync("unregister", _listRef);
-                await _clickOutsideModule.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // The circuit is already tearing down (e.g. InteractiveAuto handing off to WebAssembly) - nothing to clean up.
-            }
+            return;
         }
 
-        _dotNetRef?.Dispose();
+        _showExclusionsModal = true;
+    }
+
+    private void CloseExclusionsModal()
+    {
+        _showExclusionsModal = false;
+        _newExclusionWord = string.Empty;
     }
 
     private IEnumerable<string> GetFilteredCandidates()
@@ -131,10 +224,113 @@
             return;
         }
 
-        await MerchantMappingRepository.SetMapping(_selectedName, mappedTo);
+        try
+        {
+            await MerchantMappingRepository.SetMapping(_selectedName, mappedTo);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _mappingError = ex.Message;
+            return;
+        }
+
         _mappings[_selectedName] = mappedTo;
 
         _selectedName = null;
         _filterText = string.Empty;
+        _mappingError = null;
+        RecomputeSimilarGroups();
+    }
+
+    private async Task SwapMapping()
+    {
+        if (_selectedName is null || !_mappings.TryGetValue(_selectedName, out var currentMappedTo))
+        {
+            return;
+        }
+
+        try
+        {
+            await MerchantMappingRepository.RemoveMapping(_selectedName);
+            await MerchantMappingRepository.SetMapping(currentMappedTo, _selectedName);
+        }
+        catch (InvalidOperationException ex)
+        {
+            _mappingError = ex.Message;
+            return;
+        }
+
+        _mappings.Remove(_selectedName);
+        _mappings[currentMappedTo] = _selectedName;
+
+        _selectedName = null;
+        _filterText = string.Empty;
+        _mappingError = null;
+        RecomputeSimilarGroups();
+    }
+
+    private async Task AddExclusion()
+    {
+        var word = _newExclusionWord.Trim();
+        if (word.Length == 0 || _exclusions.Contains(word, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        await MerchantNameExclusionRepository.Add(word);
+        _exclusions.Add(word);
+        _newExclusionWord = string.Empty;
+        RecomputeSimilarGroups();
+    }
+
+    private async Task RemoveExclusion(string word)
+    {
+        await MerchantNameExclusionRepository.Remove(word);
+        _exclusions.RemoveAll(w => string.Equals(w, word, StringComparison.OrdinalIgnoreCase));
+        RecomputeSimilarGroups();
+    }
+
+    private async Task OnExclusionInputKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddExclusion();
+        }
+    }
+
+    private HashSet<string> GetSignificantWords(string name)
+    {
+        return name
+            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .Where(word => !DigitsOnly.IsMatch(word))
+            .Where(word => !_exclusions.Contains(word, StringComparer.OrdinalIgnoreCase))
+            .Select(word => word.ToUpperInvariant())
+            .ToHashSet();
+    }
+
+    private void RecomputeSimilarGroups()
+    {
+        _similarCandidates = new Dictionary<string, List<string>>();
+
+        var unmapped = (MerchantNames ?? []).Where(name => !_mappings.ContainsKey(name)).ToList();
+        var wordsByName = unmapped.ToDictionary(name => name, GetSignificantWords);
+
+        foreach (var name in unmapped)
+        {
+            var words = wordsByName[name];
+            if (words.Count == 0)
+            {
+                continue;
+            }
+
+            var candidates = unmapped
+                .Where(other => other != name && wordsByName[other].Overlaps(words))
+                .ToList();
+
+            if (candidates.Count > 0)
+            {
+                _similarCandidates[name] = candidates;
+            }
+        }
     }
 }

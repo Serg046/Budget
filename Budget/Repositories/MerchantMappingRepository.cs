@@ -18,7 +18,15 @@ public class MerchantMappingRepository(IMongoDatabase database, ITransactionRepo
         var knownMerchantNames = await transactionRepository.GetDistinctMerchantNames();
         if (!knownMerchantNames.Contains(mappedTo))
         {
-            throw new ArgumentException($"'{mappedTo}' is not a known merchant name.", nameof(mappedTo));
+            throw new ArgumentException($"'{mappedTo}' is not a known merchant name.");
+        }
+
+        var existingMappings = await GetAll();
+        var chainTarget = existingMappings.FirstOrDefault(m => m.MappedFrom == mappedTo);
+        if (chainTarget is not null)
+        {
+            throw new ArgumentException(
+                $"'{mappedTo}' is itself mapped to '{chainTarget.MappedTo}'. Map to '{chainTarget.MappedTo}' directly instead.");
         }
 
         var filter = Builders<MerchantMapping>.Filter.Eq(m => m.MappedFrom, mappedFrom);
@@ -27,5 +35,10 @@ public class MerchantMappingRepository(IMongoDatabase database, ITransactionRepo
             .Set(m => m.MappedTo, mappedTo);
 
         await _collection.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true });
+    }
+
+    public async Task RemoveMapping(string mappedFrom)
+    {
+        await _collection.DeleteOneAsync(Builders<MerchantMapping>.Filter.Eq(m => m.MappedFrom, mappedFrom));
     }
 }
