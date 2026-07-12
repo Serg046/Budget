@@ -11,4 +11,8 @@ public interface ITransactionRepository
     Task<List<string>> GetDistinctMerchantNames();
 
     Task<Dictionary<string, decimal>> GetTotalSpentByMerchant();
+
+    Task<List<MonthlySpend>> GetMonthlySpendByMerchant(DateOnly from, DateOnly to);
+
+    Task<DateOnly?> GetEarliestBookingDate();
 }

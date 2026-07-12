@@ -84,6 +84,10 @@ app.MapGet("/api/merchants", async (ITransactionRepository repo) =>
     await repo.GetDistinctMerchantNames());
 app.MapGet("/api/merchant-totals", async (ITransactionRepository repo) =>
     await repo.GetTotalSpentByMerchant());
+app.MapGet("/api/monthly-spend", async (DateOnly from, DateOnly to, ITransactionRepository repo) =>
+    await repo.GetMonthlySpendByMerchant(from, to));
+app.MapGet("/api/earliest-transaction-date", async (ITransactionRepository repo) =>
+    await repo.GetEarliestBookingDate());
 app.MapGet("/api/merchant-mappings", async (IMerchantMappingRepository repo) =>
     await repo.GetAll());
 app.MapPost("/api/merchant-mappings", async (MerchantMapping mapping, IMerchantMappingRepository repo) =>

@@ -66,6 +66,39 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
         return totals;
     }
 
+    public async Task<List<MonthlySpend>> GetMonthlySpendByMerchant(DateOnly from, DateOnly to)
+    {
+        var filter = Builders<TransactionDocument>.Filter.Gte(t => t.BookingDate, from) &
+                     Builders<TransactionDocument>.Filter.Lte(t => t.BookingDate, to) &
+                     Builders<TransactionDocument>.Filter.Eq(t => t.CreditDebitIndicator, "DBIT") &
+                     Builders<TransactionDocument>.Filter.Ne(t => t.Creditor!.Name, null);
+
+        var spends = await _collection.Find(filter)
+            .Project(t => new { t.BookingDate, Name = t.Creditor!.Name!, t.TransactionAmount.Value })
+            .ToListAsync();
+
+        return spends
+            .GroupBy(s => (Month: new DateOnly(s.BookingDate!.Value.Year, s.BookingDate.Value.Month, 1), Name: MerchantNameNormalizer.Normalize(s.Name)))
+            .Select(g => new MonthlySpend
+            {
+                Month = g.Key.Month,
+                MerchantName = g.Key.Name,
+                Total = g.Sum(s => decimal.Parse(s.Value, CultureInfo.InvariantCulture))
+            })
+            .ToList();
+    }
+
+    public async Task<DateOnly?> GetEarliestBookingDate()
+    {
+        var filter = Builders<TransactionDocument>.Filter.Ne(t => t.BookingDate, null);
+        var earliest = await _collection.Find(filter)
+            .SortBy(t => t.BookingDate)
+            .Limit(1)
+            .FirstOrDefaultAsync();
+
+        return earliest?.BookingDate;
+    }
+
     public async Task<HashSet<string>> GetExistingEntryReferences(IEnumerable<string> entryReferences)
     {
         var filter = Builders<TransactionDocument>.Filter.In(t => t.EntryReference, entryReferences);

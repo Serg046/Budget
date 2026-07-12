@@ -1,0 +1,231 @@
+.viz-root {
+    --surface-1: #fcfcfb;
+    --text-primary: #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted: #898781;
+    --gridline: #e1e0d9;
+    --baseline: #c3c2b7;
+}
+
+.trends-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+}
+
+.trends-toolbar__range {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.trends-toolbar__range-sep {
+    color: #52514e;
+    font-size: 0.85rem;
+}
+
+.trends-toolbar__month-input {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #d6d5d5;
+    border-radius: 0.25rem;
+}
+
+.trends-toolbar__mode {
+    display: flex;
+    border: 1px solid #3a0647;
+    border-radius: 0.25rem;
+    overflow: hidden;
+}
+
+.trends-toolbar__mode-btn {
+    border: none;
+    background: #fff;
+    color: #3a0647;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+}
+
+.trends-toolbar__mode-btn + .trends-toolbar__mode-btn {
+    border-left: 1px solid #3a0647;
+}
+
+.trends-toolbar__mode-btn--active {
+    background: #3a0647;
+    color: #fff;
+}
+
+.trends-toolbar__table-toggle {
+    margin-left: auto;
+    border: 1px solid #3a0647;
+    background: #fff;
+    color: #3a0647;
+    border-radius: 0.25rem;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+}
+
+.trends-toolbar__table-toggle:hover {
+    background-color: #f3eaf7;
+}
+
+.trends-loading {
+    color: #52514e;
+}
+
+.trends-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    background-color: var(--surface-1);
+    border: 1px solid #d6d5d5;
+    border-radius: 0.5rem;
+    padding: 1.25rem;
+}
+
+.trends-chart__plot {
+    position: relative;
+}
+
+.trends-chart__svg {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.trends-chart__gridline {
+    stroke: var(--gridline);
+    stroke-width: 1;
+}
+
+.trends-chart__baseline {
+    stroke: var(--baseline);
+    stroke-width: 1;
+}
+
+.trends-chart__axis-label {
+    fill: var(--text-muted);
+    font-size: 10px;
+}
+
+.trends-chart__axis-label--year {
+    fill: var(--text-secondary);
+}
+
+.trends-chart__line {
+    fill: none;
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    cursor: pointer;
+    transition: stroke 0.15s ease;
+}
+
+.trends-chart__line--selected {
+    stroke-width: 2.5;
+}
+
+.trends-chart__marker {
+    stroke: var(--surface-1);
+    stroke-width: 2;
+    cursor: pointer;
+    transition: fill 0.15s ease;
+}
+
+.trends-chart__marker:hover {
+    r: 5;
+}
+
+.trends-chart__tooltip {
+    position: absolute;
+    transform: translate(-50%, -100%) translateY(-8px);
+    background: #0b0b0b;
+    color: #fff;
+    padding: 0.4rem 0.6rem;
+    border-radius: 0.3rem;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.trends-chart__tooltip strong {
+    font-size: 0.85rem;
+}
+
+.trends-chart__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.25rem;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f0f0f0;
+}
+
+.trends-chart__legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+    color: #52514e;
+    cursor: pointer;
+    padding: 0.15rem 0.4rem;
+    margin: 0 -0.4rem;
+    border-radius: 0.25rem;
+}
+
+.trends-chart__legend-item:hover {
+    background-color: #f3eaf7;
+}
+
+.trends-chart__legend-item--selected {
+    background-color: #e6d5ee;
+    color: #3a0647;
+    font-weight: 600;
+}
+
+.trends-chart__legend-swatch {
+    width: 0.7rem;
+    height: 0.7rem;
+    border-radius: 0.15rem;
+    flex-shrink: 0;
+}
+
+.trends-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #d6d5d5;
+    border-radius: 0.5rem;
+}
+
+.trends-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.trends-table th,
+.trends-table td {
+    padding: 0.5rem 0.9rem;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.trends-table th:first-child,
+.trends-table td:first-child {
+    text-align: left;
+}
+
+.trends-table thead th {
+    border-bottom: 1px solid #d6d5d5;
+    color: #3a0647;
+    font-weight: 600;
+}
+
+.trends-table tbody tr:hover {
+    background-color: #f3eaf7;
+}
+
+.trends-table__total {
+    font-weight: 600;
+    color: #3a0647;
+}
