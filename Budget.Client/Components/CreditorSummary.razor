@@ -1,8 +1,6 @@
 @using System.Globalization
 @using Budget.Client.Models
-@using Budget.Client.Repositories
 @using Budget.Client.Services
-@inject IMerchantMappingRepository MerchantMappingRepository
 
 <div class="creditor-summary">
     <h2 class="creditor-summary__title">By Merchant</h2>
@@ -22,24 +20,19 @@
     public List<TransactionDocument>? Transactions { get; set; }
 
     [Parameter]
+    public Dictionary<string, string> Mappings { get; set; } = new();
+
+    [Parameter]
     public string? SelectedName { get; set; }
 
     [Parameter]
     public EventCallback<string?> OnSelect { get; set; }
 
-    private Dictionary<string, string> _mappings = new();
-
-    protected override async Task OnInitializedAsync()
-    {
-        var mappings = await MerchantMappingRepository.GetAll();
-        _mappings = mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
-    }
-
     private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetCreditorTotals()
     {
         return (Transactions ?? [])
             .Where(t => t.Creditor?.Name is not null)
-            .GroupBy(t => MerchantResolution.ResolveCanonicalName(t.Creditor!.Name!, _mappings))
+            .GroupBy(t => MerchantResolution.ResolveCanonicalName(t.Creditor!.Name!, Mappings))
             .Select(g => (
                 Name: g.Key,
                 Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),

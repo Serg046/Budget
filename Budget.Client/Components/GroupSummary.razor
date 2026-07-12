@@ -1,9 +1,6 @@
 @using System.Globalization
 @using Budget.Client.Models
-@using Budget.Client.Repositories
 @using Budget.Client.Services
-@inject IMerchantMappingRepository MerchantMappingRepository
-@inject IMerchantGroupRepository MerchantGroupRepository
 
 <div class="group-summary">
     <h2 class="group-summary__title">By Group</h2>
@@ -23,28 +20,22 @@
     public List<TransactionDocument>? Transactions { get; set; }
 
     [Parameter]
+    public Dictionary<string, string> Mappings { get; set; } = new();
+
+    [Parameter]
+    public Dictionary<string, string> GroupAssignments { get; set; } = new();
+
+    [Parameter]
     public string? SelectedName { get; set; }
 
     [Parameter]
     public EventCallback<string?> OnSelect { get; set; }
 
-    private Dictionary<string, string> _mappings = new();
-    private Dictionary<string, string> _groupAssignments = new();
-
-    protected override async Task OnInitializedAsync()
-    {
-        var mappings = await MerchantMappingRepository.GetAll();
-        _mappings = mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
-
-        var assignments = await MerchantGroupRepository.GetAssignments();
-        _groupAssignments = assignments.ToDictionary(a => a.MerchantName, a => a.GroupName);
-    }
-
     private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetGroupTotals()
     {
         return (Transactions ?? [])
             .Where(t => t.Creditor?.Name is not null)
-            .GroupBy(t => MerchantResolution.ResolveGroupName(t.Creditor!.Name!, _mappings, _groupAssignments))
+            .GroupBy(t => MerchantResolution.ResolveGroupName(t.Creditor!.Name!, Mappings, GroupAssignments))
             .Select(g => (
                 Name: g.Key,
                 Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),

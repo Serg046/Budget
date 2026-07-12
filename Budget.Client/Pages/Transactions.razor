@@ -45,8 +45,8 @@
     </div>
 
     <div class="page-columns__sidebar" @ref="_sidebarRef">
-        <GroupSummary Transactions="TransactionList" SelectedName="_selectedGroup" OnSelect="SelectGroup"/>
-        <CreditorSummary Transactions="TransactionList" SelectedName="_selectedMerchant" OnSelect="SelectMerchant"/>
+        <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="_selectedGroup" OnSelect="SelectGroup"/>
+        <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="_selectedMerchant" OnSelect="SelectMerchant"/>
     </div>
 </div>
 
