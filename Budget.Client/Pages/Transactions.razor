@@ -45,8 +45,8 @@
     </div>
 
     <div class="page-columns__sidebar" @ref="_sidebarRef">
-        <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="_selectedGroup" OnSelect="SelectGroup"/>
-        <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="_selectedMerchant" OnSelect="SelectMerchant"/>
+        <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="@SelectedGroup" OnSelect="SelectGroup"/>
+        <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="@SelectedMerchant" OnSelect="SelectMerchant"/>
     </div>
 </div>
 
@@ -89,9 +89,13 @@
     [PersistentState]
     public List<MerchantGroupAssignment>? GroupAssignments { get; set; }
 
+    [PersistentState]
+    public string? SelectedMerchant { get; set; }
+
+    [PersistentState]
+    public string? SelectedGroup { get; set; }
+
     private string? SelectedTransactionJson { get; set; }
-    private string? _selectedMerchant;
-    private string? _selectedGroup;
     private Dictionary<string, string> _mappings = new();
     private Dictionary<string, string> _groupAssignments = new();
     private ElementReference _sidebarRef;
@@ -119,14 +123,14 @@
 
     private void SelectMerchant(string? name)
     {
-        _selectedMerchant = name;
-        _selectedGroup = null;
+        SelectedMerchant = name;
+        SelectedGroup = null;
     }
 
     private void SelectGroup(string? name)
     {
-        _selectedGroup = name;
-        _selectedMerchant = null;
+        SelectedGroup = name;
+        SelectedMerchant = null;
     }
 
     private bool IsHighlighted(TransactionDocument t)
@@ -136,14 +140,14 @@
             return false;
         }
 
-        if (_selectedMerchant is not null)
+        if (SelectedMerchant is not null)
         {
-            return MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings) == _selectedMerchant;
+            return MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings) == SelectedMerchant;
         }
 
-        if (_selectedGroup is not null)
+        if (SelectedGroup is not null)
         {
-            return MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments) == _selectedGroup;
+            return MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments) == SelectedGroup;
         }
 
         return false;
@@ -162,10 +166,10 @@
     [JSInvokable]
     public void OnClickOutside()
     {
-        if (_selectedMerchant is not null || _selectedGroup is not null)
+        if (SelectedMerchant is not null || SelectedGroup is not null)
         {
-            _selectedMerchant = null;
-            _selectedGroup = null;
+            SelectedMerchant = null;
+            SelectedGroup = null;
             StateHasChanged();
         }
     }

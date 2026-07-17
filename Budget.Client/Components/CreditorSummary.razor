@@ -3,7 +3,10 @@
 @using Budget.Client.Services
 
 <div class="creditor-summary">
-    <h2 class="creditor-summary__title">By Merchant</h2>
+    <div class="creditor-summary__header">
+        <h2 class="creditor-summary__title">By Merchant</h2>
+        <span class="creditor-summary__grand-total">@GetGrandTotalText()</span>
+    </div>
     <ul class="creditor-summary__list">
         @foreach (var creditor in GetCreditorTotals())
         {
@@ -40,6 +43,13 @@
                 ShowPlus: g.All(t => t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null)))
             .OrderByDescending(g => g.Total);
     }
+
+    private string GetGrandTotalText() =>
+        string.Join(" ", GetCreditorTotals()
+            .GroupBy(g => g.Currency)
+            .Select(g => (Currency: g.Key, Total: g.Sum(x => x.Total)))
+            .OrderByDescending(g => g.Total)
+            .Select(g => $"{FormatCurrency(g.Currency)}{g.Total.ToString("0.00", CultureInfo.InvariantCulture)}"));
 
     private async Task Select(string name)
     {

@@ -9,9 +9,24 @@
     padding: 1rem 1.25rem;
 }
 
-.group-summary__title {
+.group-summary__header {
     flex-shrink: 0;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
     margin: 0 0 0.5rem;
+}
+
+.group-summary__title {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #3a0647;
+}
+
+.group-summary__grand-total {
+    flex-shrink: 0;
     font-size: 0.95rem;
     font-weight: 600;
     color: #3a0647;
