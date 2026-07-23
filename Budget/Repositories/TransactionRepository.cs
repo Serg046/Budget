@@ -1,7 +1,6 @@
 using System.Globalization;
 using Budget.Client.Models;
 using Budget.Client.Repositories;
-using Budget.Client.Services;
 using MongoDB.Driver;
 
 namespace Budget.Repositories;
@@ -40,7 +39,7 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
 
         return rawNames
             .Where(name => name is not null)
-            .Select(name => MerchantNameNormalizer.Normalize(name!))
+            .Select(name => name!)
             .Distinct()
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
@@ -58,9 +57,8 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
         var totals = new Dictionary<string, decimal>();
         foreach (var spend in spends)
         {
-            var normalized = MerchantNameNormalizer.Normalize(spend.Name);
             var amount = decimal.Parse(spend.Value, CultureInfo.InvariantCulture);
-            totals[normalized] = totals.GetValueOrDefault(normalized) + amount;
+            totals[spend.Name] = totals.GetValueOrDefault(spend.Name) + amount;
         }
 
         return totals;
@@ -78,7 +76,7 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
             .ToListAsync();
 
         return spends
-            .GroupBy(s => (Month: new DateOnly(s.BookingDate!.Value.Year, s.BookingDate.Value.Month, 1), Name: MerchantNameNormalizer.Normalize(s.Name)))
+            .GroupBy(s => (Month: new DateOnly(s.BookingDate!.Value.Year, s.BookingDate.Value.Month, 1), s.Name))
             .Select(g => new MonthlySpend
             {
                 Month = g.Key.Month,
