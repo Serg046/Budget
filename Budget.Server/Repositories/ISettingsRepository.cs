@@ -1,6 +1,6 @@
-using Budget.Models;
+using Budget.Server.Models;
 
-namespace Budget.Repositories;
+namespace Budget.Server.Repositories;
 
 public interface ISettingsRepository
 {

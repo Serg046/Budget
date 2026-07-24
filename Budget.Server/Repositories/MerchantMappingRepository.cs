@@ -2,7 +2,7 @@ using Budget.Client.Models;
 using Budget.Client.Repositories;
 using MongoDB.Driver;
 
-namespace Budget.Repositories;
+namespace Budget.Server.Repositories;
 
 public class MerchantMappingRepository(IMongoDatabase database, ITransactionRepository transactionRepository) : IMerchantMappingRepository
 {

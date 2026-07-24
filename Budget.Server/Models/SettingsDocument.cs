@@ -1,7 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace Budget.Models;
+namespace Budget.Server.Models;
 
 public class SettingsDocument
 {

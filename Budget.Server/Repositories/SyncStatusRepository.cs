@@ -1,7 +1,7 @@
 using Budget.Client.Repositories;
-using Budget.Services;
+using Budget.Server.Services;
 
-namespace Budget.Repositories;
+namespace Budget.Server.Repositories;
 
 public class SyncStatusRepository(ISettingsRepository settingsRepository, SyncService syncService, IHttpContextAccessor httpContextAccessor, IConfiguration configuration) : ISyncStatusRepository
 {

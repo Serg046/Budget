@@ -1,4 +1,4 @@
-namespace Budget.Models;
+namespace Budget.Server.Models;
 
 public class AuthUser
 {

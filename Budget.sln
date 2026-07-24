@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Budget", "Budget\Budget.csproj", "{86E0E4ED-8E9A-4581-8645-FA55C8CF9ED9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Budget.Server", "Budget.Server\Budget.Server.csproj", "{86E0E4ED-8E9A-4581-8645-FA55C8CF9ED9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Budget.Client", "Budget.Client\Budget.Client.csproj", "{CDFEA92F-E024-40C4-B079-85B644446468}"
 EndProject

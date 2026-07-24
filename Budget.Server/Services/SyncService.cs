@@ -3,9 +3,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Budget.Client.Models;
-using Budget.Repositories;
+using Budget.Server.Repositories;
 
-namespace Budget.Services;
+namespace Budget.Server.Services;
 
 public class SyncService(IConfiguration configuration, ISettingsRepository settingsRepository, TransactionRepository transactionRepository)
 {

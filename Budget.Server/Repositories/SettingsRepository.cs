@@ -1,7 +1,7 @@
-using Budget.Models;
+using Budget.Server.Models;
 using MongoDB.Driver;
 
-namespace Budget.Repositories;
+namespace Budget.Server.Repositories;
 
 public class SettingsRepository : ISettingsRepository
 {
