@@ -6,7 +6,7 @@
 @using Budget.Client.Models
 @using Budget.Client.Repositories
 @using Budget.Client.Services
-@implements IAsyncDisposable
+@implements IDisposable
 @inject ITransactionRepository TransactionRepository
 @inject IMerchantMappingRepository MerchantMappingRepository
 @inject IMerchantGroupRepository MerchantGroupRepository
@@ -16,24 +16,26 @@
 
 <PageTitle>Transactions</PageTitle>
 
-<div class="month-picker">
-    <button class="month-picker__nav" @onclick="PreviousMonth" aria-label="Previous month">&#8249;</button>
-    <span class="month-picker__label">@Month.ToString("MMMM yyyy")</span>
-    <button class="month-picker__nav" @onclick="NextMonth" aria-label="Next month">&#8250;</button>
-</div>
+<!-- @onclick="ClearSelection" here + @onclick:stopPropagation on .page-columns
+     below is how "click outside clears the selection" works, with no JS: any
+     click that isn't stopped by something nested (a row, a sidebar item, the
+     row menu, etc.) bubbles up through Blazor's own event dispatch to here. -->
+<div @onclick="ClearSelection">
+    <div class="month-picker">
+        <button class="month-picker__nav" @onclick="PreviousMonth" aria-label="Previous month">&#8249;</button>
+        <span class="month-picker__label">@Month.ToString("MMMM yyyy")</span>
+        <button class="month-picker__nav" @onclick="NextMonth" aria-label="Next month">&#8250;</button>
+    </div>
 
-<!-- @ref spans both columns, not just the sidebar: without this, opening the row
-     actions menu or the change-group modal (both live in the main column) would
-     register as a click "outside" the sidebar and clear any active selection. -->
-<div class="page-columns" @ref="_pageColumnsRef">
-    <div class="page-columns__main">
+    <div class="page-columns" @onclick:stopPropagation="true">
+        <div class="page-columns__main">
         <table>
             <thead>
                 <tr>
                     <th>Date</th>
                     <th>Amount</th>
                     <th>Merchant</th>
-                    <th class="transactions-table__actions-header"><span class="visually-hidden">Actions</span></th>
+                    <th class="transactions-table__actions-header"></th>
                 </tr>
             </thead>
             <tbody>
@@ -65,9 +67,10 @@
         </table>
     </div>
 
-    <div class="page-columns__sidebar">
-        <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="@SelectedGroup" OnSelect="SelectGroup"/>
-        <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="@SelectedMerchant" OnSelect="SelectMerchant"/>
+        <div class="page-columns__sidebar">
+            <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="@SelectedGroup" OnSelect="SelectGroup"/>
+            <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="@SelectedMerchant" OnSelect="SelectMerchant"/>
+        </div>
     </div>
 </div>
 
@@ -154,9 +157,6 @@
     private bool _isAdmin;
     private TransactionDocument? _menuOpenFor;
     private TransactionDocument? _groupPickerTransaction;
-    private ElementReference _pageColumnsRef;
-    private IJSObjectReference? _clickOutsideModule;
-    private DotNetObjectReference<Transactions>? _dotNetRef;
 
     protected override async Task OnInitializedAsync()
     {
@@ -183,20 +183,31 @@
         await LoadTransactions();
     }
 
+    private void ClearSelection()
+    {
+        SelectedMerchant = null;
+        SelectedGroup = null;
+        _menuOpenFor = null;
+    }
+
     private void SelectMerchant(string? name)
     {
         SelectedMerchant = name;
         SelectedGroup = null;
+        _menuOpenFor = null;
     }
 
     private void SelectGroup(string? name)
     {
         SelectedGroup = name;
         SelectedMerchant = null;
+        _menuOpenFor = null;
     }
 
     private void SelectTransaction(TransactionDocument t)
     {
+        _menuOpenFor = null;
+
         if (t.Creditor?.Name is null)
         {
             return;
@@ -244,16 +255,6 @@
         _menuOpenFor = _menuOpenFor == t ? null : t;
     }
 
-    [JSInvokable]
-    public void OnClickOutsideMenu()
-    {
-        if (_menuOpenFor is not null)
-        {
-            _menuOpenFor = null;
-            StateHasChanged();
-        }
-    }
-
     private void OpenDetailsFromMenu(TransactionDocument t)
     {
         _menuOpenFor = null;
@@ -289,27 +290,6 @@
         _groupPickerTransaction = null;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            _dotNetRef = DotNetObjectReference.Create(this);
-            _clickOutsideModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/clickOutside.js");
-            await _clickOutsideModule.InvokeVoidAsync("register", _dotNetRef, _pageColumnsRef);
-        }
-    }
-
-    [JSInvokable]
-    public void OnClickOutside()
-    {
-        if (SelectedMerchant is not null || SelectedGroup is not null)
-        {
-            SelectedMerchant = null;
-            SelectedGroup = null;
-            StateHasChanged();
-        }
-    }
-
     private void OnSyncCompleted()
     {
         _ = InvokeAsync(async () =>
@@ -319,24 +299,9 @@
         });
     }
 
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
         SyncStatusState.SyncCompleted -= OnSyncCompleted;
-
-        if (_clickOutsideModule is not null)
-        {
-            try
-            {
-                await _clickOutsideModule.InvokeVoidAsync("unregister", _pageColumnsRef);
-                await _clickOutsideModule.DisposeAsync();
-            }
-            catch (JSDisconnectedException)
-            {
-                // The circuit is already tearing down (e.g. InteractiveAuto handing off to WebAssembly) - nothing to clean up.
-            }
-        }
-
-        _dotNetRef?.Dispose();
     }
 
     private async Task PreviousMonth()

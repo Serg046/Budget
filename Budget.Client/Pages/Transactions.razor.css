@@ -64,9 +64,15 @@
     height: 100%;
 }
 
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
 table th,
 table td {
     padding: 0.4rem 1rem;
+    text-align: left;
 }
 
 table tbody tr {

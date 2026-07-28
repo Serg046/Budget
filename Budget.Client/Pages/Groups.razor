@@ -166,12 +166,29 @@
 
         _draggedMerchant = name;
     }
+    
+    private const string DragScrollModuleSource = """
+        const EDGE_PERCENT = 0.2;
+        const SCROLL_SPEED = 20;
+
+        export function checkEdgeScroll(boardElement, clientX) {
+            const rect = boardElement.getBoundingClientRect();
+            const edgeSize = rect.width * EDGE_PERCENT;
+
+            if (clientX < rect.left + edgeSize) {
+                boardElement.scrollLeft -= SCROLL_SPEED;
+            } else if (clientX > rect.right - edgeSize) {
+                boardElement.scrollLeft += SCROLL_SPEED;
+            }
+        }
+        """;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            _dragScrollModule = await JS.InvokeAsync<IJSObjectReference>("import", "./js/dragScroll.js");
+            var moduleUrl = "data:text/javascript;charset=utf-8," + Uri.EscapeDataString(DragScrollModuleSource);
+            _dragScrollModule = await JS.InvokeAsync<IJSObjectReference>("import", moduleUrl);
         }
     }
 
