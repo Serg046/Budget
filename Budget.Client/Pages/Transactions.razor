@@ -157,6 +157,7 @@
     private bool _isAdmin;
     private TransactionDocument? _menuOpenFor;
     private TransactionDocument? _groupPickerTransaction;
+    private TransactionDocument? _selectedTransaction;
 
     protected override async Task OnInitializedAsync()
     {
@@ -188,6 +189,7 @@
         SelectedMerchant = null;
         SelectedGroup = null;
         _menuOpenFor = null;
+        _selectedTransaction = null;
     }
 
     private void SelectMerchant(string? name)
@@ -195,6 +197,7 @@
         SelectedMerchant = name;
         SelectedGroup = null;
         _menuOpenFor = null;
+        _selectedTransaction = null;
     }
 
     private void SelectGroup(string? name)
@@ -202,41 +205,49 @@
         SelectedGroup = name;
         SelectedMerchant = null;
         _menuOpenFor = null;
+        _selectedTransaction = null;
     }
 
     private void SelectTransaction(TransactionDocument t)
     {
         _menuOpenFor = null;
 
-        if (t.Creditor?.Name is null)
+        if (_selectedTransaction == t)
         {
+            _selectedTransaction = null;
+            SelectedMerchant = null;
+            SelectedGroup = null;
             return;
         }
 
-        var merchant = MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings);
-        var group = MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments);
+        _selectedTransaction = t;
 
-        if (SelectedMerchant == merchant && SelectedGroup == group)
+        if (t.Creditor?.Name is null)
         {
             SelectedMerchant = null;
             SelectedGroup = null;
+            return;
         }
-        else
-        {
-            SelectedMerchant = merchant;
-            SelectedGroup = group;
-        }
+
+        SelectedMerchant = MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings);
+        SelectedGroup = MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments);
     }
 
     private bool IsHighlighted(TransactionDocument t)
     {
+        // A row picked directly highlights only itself in the table - its group/merchant
+        // are still reflected as selected in the sidebar widgets via SelectedMerchant/Group,
+        // set above in SelectTransaction, but every other row here stays unhighlighted.
+        if (_selectedTransaction is not null)
+        {
+            return t == _selectedTransaction;
+        }
+
         if (t.Creditor?.Name is null)
         {
             return false;
         }
 
-        // Group is checked first so a transaction pick (which sets both) highlights the
-        // whole group, not just the one merchant - see SelectTransaction.
         if (SelectedGroup is not null)
         {
             return MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments) == SelectedGroup;
