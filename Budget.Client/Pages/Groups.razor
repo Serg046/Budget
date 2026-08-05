@@ -12,15 +12,21 @@
 
 <PageTitle>Groups</PageTitle>
 
-<div class="groups-board" @ref="_boardRef">
-    <div class="groups-board__column" @ondragover="OnDragOver" @ondragover:preventDefault="true" @ondrop="() => Drop(IMerchantGroupRepository.OthersGroupName)">
+<div class="groups-board-wrapper">
+<!-- @ondragover here is a catch-all for the edge-scroll check: a column shrinks to
+     fit its own items rather than stretching to the board's full height, so a short
+     column leaves empty space below it that no column-level @ondragover would cover.
+     @ondragover:stopPropagation on each column below prevents this from also firing
+     a second time (via bubbling) whenever the drag is directly over a column. -->
+<div class="groups-board" @ref="_boardRef" @ondragover="OnDragOver">
+    <div class="groups-board__column" @ondragover="OnDragOver" @ondragover:preventDefault="true" @ondragover:stopPropagation="true" @ondrop="() => Drop(IMerchantGroupRepository.OthersGroupName)">
         <div class="groups-board__column-header">
             <h2>@IMerchantGroupRepository.OthersGroupName</h2>
         </div>
         <ul class="groups-board__list">
             @foreach (var name in GetMerchantsInGroup(IMerchantGroupRepository.OthersGroupName))
             {
-                <li class="groups-board__item" draggable="@(_isAdmin ? "true" : "false")" @ondragstart="() => DragStart(name)">
+                <li class="groups-board__item" draggable="@(_isAdmin ? "true" : "false")" @ondragstart="() => DragStart(name)" @ondragend="DragEnd">
                     <span class="groups-board__item-name">@name</span>
                     <span class="groups-board__item-total">€@_effectiveTotals.GetValueOrDefault(name, 0m).ToString("0.00", CultureInfo.InvariantCulture)</span>
                 </li>
@@ -30,7 +36,7 @@
 
     @foreach (var group in _groups)
     {
-        <div class="groups-board__column" @ondragover="OnDragOver" @ondragover:preventDefault="true" @ondrop="() => Drop(group)">
+        <div class="groups-board__column" @ondragover="OnDragOver" @ondragover:preventDefault="true" @ondragover:stopPropagation="true" @ondrop="() => Drop(group)">
             <div class="groups-board__column-header">
                 @if (_editingGroup == group)
                 {
@@ -55,7 +61,7 @@
             <ul class="groups-board__list">
                 @foreach (var name in GetMerchantsInGroup(group))
                 {
-                    <li class="groups-board__item" draggable="@(_isAdmin ? "true" : "false")" @ondragstart="() => DragStart(name)">
+                    <li class="groups-board__item" draggable="@(_isAdmin ? "true" : "false")" @ondragstart="() => DragStart(name)" @ondragend="DragEnd">
                     <span class="groups-board__item-name">@name</span>
                     <span class="groups-board__item-total">€@_effectiveTotals.GetValueOrDefault(name, 0m).ToString("0.00", CultureInfo.InvariantCulture)</span>
                 </li>
@@ -73,6 +79,22 @@
             <button class="groups-board__add-button" @onclick="AddGroup">Add group</button>
         </div>
     }
+</div>
+
+@if (_draggedMerchant is not null)
+{
+    <!-- Mirrors dragScroll.js's EDGE_PERCENT (20%) so the visible zone matches
+         exactly where dragging near the edge actually triggers auto-scroll. The
+         zone itself is always shown (as a boundary marker) for the whole drag;
+         --active only lights up while _activeEdge says this side is the one
+         actually scrolling right now, resetting the instant you move away. -->
+    <div class="groups-board__edge-zone groups-board__edge-zone--left @(_activeEdge == "left" ? "groups-board__edge-zone--active" : "")">
+        <span class="groups-board__edge-zone-arrow">&#8249;</span>
+    </div>
+    <div class="groups-board__edge-zone groups-board__edge-zone--right @(_activeEdge == "right" ? "groups-board__edge-zone--active" : "")">
+        <span class="groups-board__edge-zone-arrow">&#8250;</span>
+    </div>
+}
 </div>
 
 @code {
@@ -100,6 +122,7 @@
     private Dictionary<string, string> _assignments = new();
     private Dictionary<string, decimal> _effectiveTotals = new();
     private string? _draggedMerchant;
+    private string? _activeEdge;
     private string _newGroupName = string.Empty;
     private string? _editingGroup;
     private string _editGroupNameValue = string.Empty;
@@ -165,8 +188,15 @@
         }
 
         _draggedMerchant = name;
+        _activeEdge = null;
     }
-    
+
+    private void DragEnd()
+    {
+        _draggedMerchant = null;
+        _activeEdge = null;
+    }
+
     private const string DragScrollModuleSource = """
         const EDGE_PERCENT = 0.2;
         const SCROLL_SPEED = 20;
@@ -177,9 +207,15 @@
 
             if (clientX < rect.left + edgeSize) {
                 boardElement.scrollLeft -= SCROLL_SPEED;
-            } else if (clientX > rect.right - edgeSize) {
-                boardElement.scrollLeft += SCROLL_SPEED;
+                return 'left';
             }
+
+            if (clientX > rect.right - edgeSize) {
+                boardElement.scrollLeft += SCROLL_SPEED;
+                return 'right';
+            }
+
+            return null;
         }
         """;
 
@@ -196,7 +232,7 @@
     {
         if (_dragScrollModule is not null)
         {
-            await _dragScrollModule.InvokeVoidAsync("checkEdgeScroll", _boardRef, e.ClientX);
+            _activeEdge = await _dragScrollModule.InvokeAsync<string?>("checkEdgeScroll", _boardRef, e.ClientX);
         }
     }
 

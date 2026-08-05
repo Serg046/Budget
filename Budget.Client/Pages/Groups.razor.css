@@ -1,9 +1,68 @@
+.groups-board-wrapper {
+    position: relative;
+    height: 100%;
+}
+
 .groups-board {
     display: flex;
     gap: 1rem;
     align-items: flex-start;
     overflow-x: auto;
     height: 100%;
+}
+
+.groups-board__edge-zone {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 20%;
+    pointer-events: none;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    background-color: transparent;
+    transition: background-color 0.1s ease;
+}
+
+.groups-board__edge-zone--left {
+    left: 0;
+    justify-content: flex-start;
+    border-right: 3px dashed rgba(58, 6, 71, 0.35);
+    transition: border-color 0.1s ease;
+}
+
+.groups-board__edge-zone--right {
+    right: 0;
+    justify-content: flex-end;
+    border-left: 3px dashed rgba(58, 6, 71, 0.35);
+    transition: border-color 0.1s ease;
+}
+
+.groups-board__edge-zone--active {
+    background-color: rgba(58, 6, 71, 0.18);
+}
+
+.groups-board__edge-zone--active.groups-board__edge-zone--left {
+    border-right-color: #3a0647;
+    border-right-style: solid;
+}
+
+.groups-board__edge-zone--active.groups-board__edge-zone--right {
+    border-left-color: #3a0647;
+    border-left-style: solid;
+}
+
+.groups-board__edge-zone-arrow {
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1;
+    color: rgba(58, 6, 71, 0.35);
+    padding: 0 0.5rem;
+    transition: color 0.1s ease;
+}
+
+.groups-board__edge-zone--active .groups-board__edge-zone-arrow {
+    color: #3a0647;
 }
 
 .groups-board__column {
