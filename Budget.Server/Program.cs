@@ -11,7 +11,10 @@ using Budget.Server.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -23,6 +26,10 @@ builder.Services.AddSingleton<IMongoClient>(_ =>
     new MongoClient(builder.Configuration["MongoDb:ConnectionString"]));
 builder.Services.AddSingleton(sp =>
     sp.GetRequiredService<IMongoClient>().GetDatabase(builder.Configuration["MongoDb:DatabaseName"]));
+builder.Services.AddSingleton<IConfigureOptions<KeyManagementOptions>>(sp =>
+    new ConfigureOptions<KeyManagementOptions>(options =>
+        options.XmlRepository = new MongoXmlRepository(sp.GetRequiredService<IMongoDatabase>())));
+builder.Services.AddDataProtection().SetApplicationName("Budget");
 builder.Services.AddSingleton<ISettingsRepository, SettingsRepository>();
 builder.Services.AddSingleton<TransactionRepository>();
 builder.Services.AddSingleton<ITransactionRepository>(sp => sp.GetRequiredService<TransactionRepository>());

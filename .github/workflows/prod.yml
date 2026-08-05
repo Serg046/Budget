@@ -1,0 +1,46 @@
+name: Production Deployment
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Generate appsettings.Production.json
+        run: |
+          jq -n \
+            --arg privateKey "$ENABLEBANKING_PRIVATE_KEY" \
+            --argjson users "$AUTH" \
+            '{
+              MongoDb: { ConnectionString: "mongodb://budget-mongo-service:27017" },
+              EnableBanking: { PrivateKey: $privateKey },
+              Auth: { Users: $users }
+            }' > Budget.Server/appsettings.Production.json
+        env:
+          ENABLEBANKING_PRIVATE_KEY: ${{ secrets.ENABLEBANKING_PRIVATE_KEY }}
+          AUTH: ${{ secrets.AUTH }}
+
+      - name: Create kube config
+        run: |
+          KUBECONFIG=$(mktemp -d)/config
+          base64 -d <(printf "%s" $KUBE_CONFIG_BASE64_DATA) > $KUBECONFIG
+          echo KUBECONFIG=$KUBECONFIG >> $GITHUB_ENV
+        env:
+          KUBE_CONFIG_BASE64_DATA: ${{ secrets.KUBE_CONFIG_BASE64_DATA }}
+
+      - name: Install werf
+        uses: werf/actions/install@v2
+
+      - name: Run werf converge
+        run: |
+          . $(werf ci-env github --as-file)
+          werf converge --platform linux/amd64 --dev --verbose
+        env:
+          WERF_ENV: production
+          GITHUB_TOKEN: ${{ github.token }}
