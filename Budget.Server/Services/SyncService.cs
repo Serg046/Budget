@@ -86,7 +86,7 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
 
     private HttpClient CreateHttpClient(string applicationId)
     {
-        var rsa = LoadPrivateKey(configuration["EnableBanking:PrivateKeyPath"]!);
+        var rsa = LoadPrivateKey(configuration["EnableBanking:PrivateKey"]!);
         var jwt = BuildJwt(applicationId, rsa);
 
         var http = new HttpClient { BaseAddress = new Uri("https://api.enablebanking.com/") };
@@ -134,9 +134,8 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
         return (page.Transactions, page.ContinuationKey);
     }
 
-    private static RSA LoadPrivateKey(string path)
+    private static RSA LoadPrivateKey(string pem)
     {
-        var pem = File.ReadAllText(path);
         var key = RSA.Create();
         key.ImportFromPem(pem);
         return key;
