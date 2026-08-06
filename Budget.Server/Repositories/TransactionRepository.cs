@@ -86,6 +86,59 @@ public class TransactionRepository(IMongoDatabase database) : ITransactionReposi
             .ToList();
     }
 
+    public async Task<List<MonthlySpend>> GetTopMerchantsMonthlySpend(DateOnly from, DateOnly to, int topN)
+    {
+        var filter = Builders<TransactionDocument>.Filter.Gte(t => t.BookingDate, from) &
+                     Builders<TransactionDocument>.Filter.Lte(t => t.BookingDate, to) &
+                     Builders<TransactionDocument>.Filter.Eq(t => t.CreditDebitIndicator, "DBIT") &
+                     Builders<TransactionDocument>.Filter.Ne(t => t.Creditor!.Name, null);
+
+        var spends = await _collection.Find(filter)
+            .Project(t => new { t.BookingDate, Name = t.Creditor!.Name!, t.TransactionAmount.Value })
+            .ToListAsync();
+
+        var topNames = spends
+            .GroupBy(s => s.Name)
+            .Select(g => new { g.Key, Total = g.Sum(s => decimal.Parse(s.Value, CultureInfo.InvariantCulture)) })
+            .OrderByDescending(g => g.Total)
+            .Take(topN)
+            .Select(g => g.Key)
+            .ToHashSet();
+
+        return spends
+            .Where(s => topNames.Contains(s.Name))
+            .GroupBy(s => (Month: new DateOnly(s.BookingDate!.Value.Year, s.BookingDate.Value.Month, 1), s.Name))
+            .Select(g => new MonthlySpend
+            {
+                Month = g.Key.Month,
+                MerchantName = g.Key.Name,
+                Total = g.Sum(s => decimal.Parse(s.Value, CultureInfo.InvariantCulture))
+            })
+            .ToList();
+    }
+
+    public async Task<List<MonthlySpend>> GetMonthlySpendForMerchant(DateOnly from, DateOnly to, string merchantName)
+    {
+        var filter = Builders<TransactionDocument>.Filter.Gte(t => t.BookingDate, from) &
+                     Builders<TransactionDocument>.Filter.Lte(t => t.BookingDate, to) &
+                     Builders<TransactionDocument>.Filter.Eq(t => t.CreditDebitIndicator, "DBIT") &
+                     Builders<TransactionDocument>.Filter.Eq(t => t.Creditor!.Name, merchantName);
+
+        var spends = await _collection.Find(filter)
+            .Project(t => new { t.BookingDate, t.TransactionAmount.Value })
+            .ToListAsync();
+
+        return spends
+            .GroupBy(s => new DateOnly(s.BookingDate!.Value.Year, s.BookingDate.Value.Month, 1))
+            .Select(g => new MonthlySpend
+            {
+                Month = g.Key,
+                MerchantName = merchantName,
+                Total = g.Sum(s => decimal.Parse(s.Value, CultureInfo.InvariantCulture))
+            })
+            .ToList();
+    }
+
     public async Task<DateOnly?> GetEarliestBookingDate()
     {
         var filter = Builders<TransactionDocument>.Filter.Ne(t => t.BookingDate, null);

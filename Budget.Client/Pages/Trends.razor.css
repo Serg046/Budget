@@ -229,3 +229,141 @@
     font-weight: 600;
     color: #3a0647;
 }
+
+.trends-toolbar__merchant-picker {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.trends-toolbar__merchant-input {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid #d6d5d5;
+    border-radius: 0.25rem;
+    min-width: 12rem;
+}
+
+.trends-toolbar__merchant-add {
+    border: 1px solid #3a0647;
+    background: #fff;
+    color: #3a0647;
+    border-radius: 0.25rem;
+    padding: 0.35rem 0.75rem;
+    cursor: pointer;
+}
+
+.trends-toolbar__merchant-add:hover {
+    background-color: #f3eaf7;
+}
+
+.trends-toolbar__button {
+    border: 1px solid #3a0647;
+    background: #fff;
+    color: #3a0647;
+    border-radius: 0.25rem;
+    padding: 0.4rem 0.9rem;
+    cursor: pointer;
+}
+
+.trends-toolbar__button:hover {
+    background-color: #f3eaf7;
+}
+
+.trends-exclusions__chips {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 28rem;
+}
+
+.trends-exclusions__empty {
+    color: #898781;
+    font-size: 0.85rem;
+}
+
+.trends-exclusions__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.15rem 0.3rem 0.15rem 0.6rem;
+    border-radius: 1rem;
+    background-color: #e6d5ee;
+    color: #3a0647;
+    font-size: 0.8rem;
+}
+
+.trends-exclusions__remove {
+    border: none;
+    background: none;
+    color: #3a0647;
+    cursor: pointer;
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 0.2rem;
+}
+
+.trends-exclusions__add-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+}
+
+.trends-exclusions__input {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #d6d5d5;
+    border-radius: 0.25rem;
+}
+
+.trends-exclusions__add {
+    border: 1px solid #3a0647;
+    background: #fff;
+    color: #3a0647;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    cursor: pointer;
+}
+
+.trends-exclusions__add:hover {
+    background-color: #f3eaf7;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+}
+
+.modal-box {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    width: min(40rem, 90vw);
+    max-height: 80vh;
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1rem 1.25rem;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.3);
+}
+
+.modal-box__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 600;
+    color: #3a0647;
+}
+
+.modal-box__close {
+    border: none;
+    background: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #3a0647;
+}

@@ -31,6 +31,18 @@ public class TransactionApiClient(HttpClient http) : ITransactionRepository
             $"api/monthly-spend?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}") ?? [];
     }
 
+    public async Task<List<MonthlySpend>> GetTopMerchantsMonthlySpend(DateOnly from, DateOnly to, int topN)
+    {
+        return await http.GetFromJsonAsync<List<MonthlySpend>>(
+            $"api/monthly-spend/top-merchants?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&topN={topN}") ?? [];
+    }
+
+    public async Task<List<MonthlySpend>> GetMonthlySpendForMerchant(DateOnly from, DateOnly to, string merchantName)
+    {
+        return await http.GetFromJsonAsync<List<MonthlySpend>>(
+            $"api/monthly-spend/merchant?from={from:yyyy-MM-dd}&to={to:yyyy-MM-dd}&merchant={Uri.EscapeDataString(merchantName)}") ?? [];
+    }
+
     public async Task<DateOnly?> GetEarliestBookingDate()
     {
         return await http.GetFromJsonAsync<DateOnly?>("api/earliest-transaction-date");

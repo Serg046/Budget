@@ -37,6 +37,7 @@ builder.Services.AddSingleton<ISyncStatusRepository, SyncStatusRepository>();
 builder.Services.AddSingleton<IMerchantMappingRepository, MerchantMappingRepository>();
 builder.Services.AddSingleton<IMerchantNameExclusionRepository, MerchantNameExclusionRepository>();
 builder.Services.AddSingleton<IMerchantGroupRepository, MerchantGroupRepository>();
+builder.Services.AddSingleton<ITrendMonthExclusionRepository, TrendMonthExclusionRepository>();
 builder.Services.AddSingleton<SyncService>();
 builder.Services.AddScoped<SyncStatusState>();
 builder.Services.AddHttpContextAccessor();
@@ -93,6 +94,10 @@ app.MapGet("/api/merchant-totals", async (ITransactionRepository repo) =>
     await repo.GetTotalSpentByMerchant());
 app.MapGet("/api/monthly-spend", async (DateOnly from, DateOnly to, ITransactionRepository repo) =>
     await repo.GetMonthlySpendByMerchant(from, to));
+app.MapGet("/api/monthly-spend/top-merchants", async (DateOnly from, DateOnly to, int topN, ITransactionRepository repo) =>
+    await repo.GetTopMerchantsMonthlySpend(from, to, topN));
+app.MapGet("/api/monthly-spend/merchant", async (DateOnly from, DateOnly to, string merchant, ITransactionRepository repo) =>
+    await repo.GetMonthlySpendForMerchant(from, to, merchant));
 app.MapGet("/api/earliest-transaction-date", async (ITransactionRepository repo) =>
     await repo.GetEarliestBookingDate());
 app.MapGet("/api/merchant-mappings", async (IMerchantMappingRepository repo) =>
@@ -124,6 +129,18 @@ app.MapPost("/api/merchant-name-exclusions", async ([FromBody] string word, IMer
 app.MapPost("/api/merchant-name-exclusions/remove", async ([FromBody] string word, IMerchantNameExclusionRepository repo) =>
 {
     await repo.Remove(word);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapGet("/api/trend-month-exclusions", async (ITrendMonthExclusionRepository repo) =>
+    await repo.GetAll());
+app.MapPost("/api/trend-month-exclusions", async ([FromBody] DateOnly month, ITrendMonthExclusionRepository repo) =>
+{
+    await repo.Add(month);
+    return Results.Ok();
+}).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
+app.MapPost("/api/trend-month-exclusions/remove", async ([FromBody] DateOnly month, ITrendMonthExclusionRepository repo) =>
+{
+    await repo.Remove(month);
     return Results.Ok();
 }).RequireAuthorization(new AuthorizeAttribute { Roles = "Admin" });
 app.MapGet("/api/merchant-groups", async (IMerchantGroupRepository repo) =>

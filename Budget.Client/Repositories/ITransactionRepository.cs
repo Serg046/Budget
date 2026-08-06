@@ -14,5 +14,9 @@ public interface ITransactionRepository
 
     Task<List<MonthlySpend>> GetMonthlySpendByMerchant(DateOnly from, DateOnly to);
 
+    Task<List<MonthlySpend>> GetTopMerchantsMonthlySpend(DateOnly from, DateOnly to, int topN);
+
+    Task<List<MonthlySpend>> GetMonthlySpendForMerchant(DateOnly from, DateOnly to, string merchantName);
+
     Task<DateOnly?> GetEarliestBookingDate();
 }
