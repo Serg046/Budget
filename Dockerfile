@@ -1,4 +1,3 @@
-# syntax=docker/dockerfile:1
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 COPY Budget.Server/Budget.Server.csproj Budget.Server/Budget.Server.csproj
 COPY Budget.Client/Budget.Client.csproj Budget.Client/Budget.Client.csproj
@@ -11,7 +10,7 @@ RUN --mount=type=secret,id=ENABLEBANKING_PRIVATE_KEY \
       -e "s|\"PrivateKey\": \"\"|\"PrivateKey\": \"$(cat /run/secrets/ENABLEBANKING_PRIVATE_KEY)\"|" \
       -e "s|\"Users\": \[\]|\"Users\": $(cat /run/secrets/AUTH)|" \
       Budget.Server/appsettings.json
-RUN dotnet publish Budget.Server/Budget.Server.csproj --no-restore
+RUN dotnet publish Budget.Server/Budget.Server.csproj
 
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
