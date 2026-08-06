@@ -15,20 +15,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate appsettings.Production.json
-        run: |
-          jq -n \
-            --arg privateKey "$ENABLEBANKING_PRIVATE_KEY" \
-            --argjson users "$AUTH" \
-            '{
-              MongoDb: { ConnectionString: "mongodb://budget-mongo-service:27017" },
-              EnableBanking: { PrivateKey: $privateKey },
-              Auth: { Users: $users }
-            }' > Budget.Server/appsettings.Production.json
-        env:
-          ENABLEBANKING_PRIVATE_KEY: ${{ secrets.ENABLEBANKING_PRIVATE_KEY }}
-          AUTH: ${{ secrets.AUTH }}
-
       - name: Create kube config
         run: |
           KUBECONFIG=$(mktemp -d)/config
@@ -47,3 +33,5 @@ jobs:
         env:
           WERF_ENV: production
           GITHUB_TOKEN: ${{ github.token }}
+          ENABLEBANKING_PRIVATE_KEY: ${{ secrets.ENABLEBANKING_PRIVATE_KEY }}
+          AUTH: ${{ secrets.AUTH }}

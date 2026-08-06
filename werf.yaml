@@ -6,3 +6,6 @@ build:
 ---
 image: app
 dockerfile: Dockerfile
+secrets:
+- env: ENABLEBANKING_PRIVATE_KEY
+- env: AUTH
