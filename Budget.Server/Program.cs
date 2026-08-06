@@ -65,7 +65,17 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     });
 builder.Services.AddAuthorization(options =>
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
+        .RequireAssertion(context =>
+        {
+            if (context.Resource is HttpContext httpContext &&
+                (httpContext.Request.Path.StartsWithSegments("/_framework") ||
+                 httpContext.Request.Path.StartsWithSegments("/_blazor")))
+            {
+                return true;
+            }
+
+            return context.User.Identity?.IsAuthenticated ?? false;
+        })
         .Build());
 
 var app = builder.Build();
