@@ -134,8 +134,9 @@ public class SyncService(IConfiguration configuration, ISettingsRepository setti
         return (page.Transactions, page.ContinuationKey);
     }
 
-    private static RSA LoadPrivateKey(string pem)
+    private static RSA LoadPrivateKey(string path)
     {
+        var pem = File.ReadAllText(path);
         var key = RSA.Create();
         key.ImportFromPem(pem);
         return key;

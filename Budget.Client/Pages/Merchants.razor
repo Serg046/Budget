@@ -8,8 +8,6 @@
 @inject IMerchantNameExclusionRepository MerchantNameExclusionRepository
 @inject ISyncStatusRepository SyncStatusRepository
 
-<PageTitle>Merchants</PageTitle>
-
 <div class="merchants-toolbar">
     <button class="merchants-toolbar__button" @onclick="OpenExclusionsModal" disabled="@(!_isAdmin)">Ignorings (@_exclusions.Count)</button>
 </div>

@@ -10,8 +10,6 @@
 @inject IMerchantMappingRepository MerchantMappingRepository
 @inject IMerchantGroupRepository MerchantGroupRepository
 
-<PageTitle>Trends</PageTitle>
-
 <div class="trends-toolbar">
     <div class="trends-toolbar__range">
         <input type="month" class="trends-toolbar__month-input" value="@_fromMonth.ToString("yyyy-MM")" @onchange="OnFromChanged"/>
