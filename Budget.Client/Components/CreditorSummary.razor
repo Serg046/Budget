@@ -12,7 +12,7 @@
         {
             <li class="creditor-summary__item @(SelectedName == creditor.Name ? "creditor-summary__item--selected" : "")" @onclick="() => Select(creditor.Name)">
                 <span class="creditor-summary__name">@creditor.Name</span>
-                <span class="creditor-summary__total">@(creditor.ShowPlus ? "+" : "")@FormatCurrency(creditor.Currency)@creditor.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                <span class="creditor-summary__total">@FormatCurrency(creditor.Currency)@creditor.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
             </li>
         }
     </ul>
@@ -31,16 +31,15 @@
     [Parameter]
     public EventCallback<string?> OnSelect { get; set; }
 
-    private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetCreditorTotals()
+    private IEnumerable<(string Name, decimal Total, string Currency)> GetCreditorTotals()
     {
         return (Transactions ?? [])
-            .Where(t => t.Creditor?.Name is not null)
+            .Where(t => t.Creditor?.Name is not null && t.CreditDebitIndicator == "DBIT")
             .GroupBy(t => MerchantResolution.ResolveCanonicalName(t.Creditor!.Name!, Mappings))
             .Select(g => (
                 Name: g.Key,
                 Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),
-                Currency: g.First().TransactionAmount.Currency,
-                ShowPlus: g.All(t => t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null)))
+                Currency: g.First().TransactionAmount.Currency))
             .OrderByDescending(g => g.Total);
     }
 

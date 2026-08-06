@@ -12,7 +12,7 @@
         {
             <li class="group-summary__item @(SelectedName == group.Name ? "group-summary__item--selected" : "")" @onclick="() => Select(group.Name)">
                 <span class="group-summary__name">@group.Name</span>
-                <span class="group-summary__total">@(group.ShowPlus ? "+" : "")@FormatCurrency(group.Currency)@group.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                <span class="group-summary__total">@FormatCurrency(group.Currency)@group.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
             </li>
         }
     </ul>
@@ -34,16 +34,15 @@
     [Parameter]
     public EventCallback<string?> OnSelect { get; set; }
 
-    private IEnumerable<(string Name, decimal Total, string Currency, bool ShowPlus)> GetGroupTotals()
+    private IEnumerable<(string Name, decimal Total, string Currency)> GetGroupTotals()
     {
         return (Transactions ?? [])
-            .Where(t => t.Creditor?.Name is not null)
+            .Where(t => t.Creditor?.Name is not null && t.CreditDebitIndicator == "DBIT")
             .GroupBy(t => MerchantResolution.ResolveGroupName(t.Creditor!.Name!, Mappings, GroupAssignments))
             .Select(g => (
                 Name: g.Key,
                 Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),
-                Currency: g.First().TransactionAmount.Currency,
-                ShowPlus: g.All(t => t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null)))
+                Currency: g.First().TransactionAmount.Currency))
             .OrderByDescending(g => g.Total);
     }
 

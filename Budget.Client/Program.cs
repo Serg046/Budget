@@ -1,6 +1,10 @@
+using System.Globalization;
 using Budget.Client.Repositories;
 using Budget.Client.Services;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
+
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
 

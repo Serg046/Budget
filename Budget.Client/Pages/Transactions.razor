@@ -37,7 +37,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var t in TransactionList ?? [])
+                @foreach (var t in (TransactionList ?? []).Where(t => t.CreditDebitIndicator == "DBIT"))
                 {
                     <tr class="@(IsHighlighted(t) ? "row--highlighted" : "")" @onclick="() => SelectTransaction(t)">
                         <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
@@ -66,8 +66,12 @@
     </div>
 
         <div class="page-columns__sidebar">
-            <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="@SelectedGroup" OnSelect="SelectGroup"/>
-            <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="@SelectedMerchant" OnSelect="SelectMerchant"/>
+            <div class="page-columns__groups">
+                <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="@SelectedGroup" OnSelect="SelectGroup"/>
+            </div>
+            <div class="page-columns__merchants">
+                <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="@SelectedMerchant" OnSelect="SelectMerchant"/>
+            </div>
         </div>
     </div>
 </div>
