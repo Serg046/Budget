@@ -1,5 +1,5 @@
 @page "/"
-@rendermode InteractiveAuto
+@rendermode InteractiveWebAssembly
 @using System.Globalization
 @using System.Text.Json
 @using Budget.Client.Components
@@ -37,7 +37,7 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach (var t in (TransactionList ?? []).Where(t => t.CreditDebitIndicator == "DBIT"))
+                @foreach (var t in (TransactionList ?? []).Where(t => !(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null)))
                 {
                     <tr class="@(IsHighlighted(t) ? "row--highlighted" : "")" @onclick="() => SelectTransaction(t)">
                         <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>

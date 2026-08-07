@@ -24,7 +24,6 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddSingleton<IMongoClient>(_ =>
     new MongoClient(builder.Configuration["MongoDb:ConnectionString"]));
@@ -237,7 +236,6 @@ app.MapGet("/api/auth/logout", async (HttpContext http) =>
 
 app.MapStaticAssets().AllowAnonymous();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
     .AddInteractiveWebAssemblyRenderMode()
     .AddAdditionalAssemblies(typeof(Budget.Client._Imports).Assembly);
 

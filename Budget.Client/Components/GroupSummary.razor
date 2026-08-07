@@ -37,7 +37,7 @@
     private IEnumerable<(string Name, decimal Total, string Currency)> GetGroupTotals()
     {
         return (Transactions ?? [])
-            .Where(t => t.Creditor?.Name is not null && t.CreditDebitIndicator == "DBIT")
+            .Where(t => t.Creditor?.Name is not null && !(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null))
             .GroupBy(t => MerchantResolution.ResolveGroupName(t.Creditor!.Name!, Mappings, GroupAssignments))
             .Select(g => (
                 Name: g.Key,

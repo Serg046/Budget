@@ -34,7 +34,7 @@
     private IEnumerable<(string Name, decimal Total, string Currency)> GetCreditorTotals()
     {
         return (Transactions ?? [])
-            .Where(t => t.Creditor?.Name is not null && t.CreditDebitIndicator == "DBIT")
+            .Where(t => t.Creditor?.Name is not null && !(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null))
             .GroupBy(t => MerchantResolution.ResolveCanonicalName(t.Creditor!.Name!, Mappings))
             .Select(g => (
                 Name: g.Key,
