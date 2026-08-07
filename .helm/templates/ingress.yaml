@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: budget-app-ingress
+  name: spendpulse-ingress
 spec:
   rules:
   - http:
@@ -10,6 +10,6 @@ spec:
         pathType: Prefix
         backend:
           service:
-            name: budget-app-service
+            name: spendpulse-service
             port:
               number: 80

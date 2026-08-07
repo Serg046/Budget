@@ -1,0 +1,67 @@
+@using System.Globalization
+@using SpendPulse.Client.Models
+@using SpendPulse.Client.Services
+
+<div class="group-summary">
+    <div class="group-summary__header">
+        <h2 class="group-summary__title">By Group</h2>
+        <span class="group-summary__grand-total">@GetGrandTotalText()</span>
+    </div>
+    <ul class="group-summary__list">
+        @foreach (var group in GetGroupTotals())
+        {
+            <li class="group-summary__item @(SelectedName == group.Name ? "group-summary__item--selected" : "")" @onclick="() => Select(group.Name)">
+                <span class="group-summary__name">@group.Name</span>
+                <span class="group-summary__total">@FormatCurrency(group.Currency)@group.Total.ToString("0.00", CultureInfo.InvariantCulture)</span>
+            </li>
+        }
+    </ul>
+</div>
+
+@code {
+    [Parameter]
+    public List<TransactionDocument>? Transactions { get; set; }
+
+    [Parameter]
+    public Dictionary<string, string> Mappings { get; set; } = new();
+
+    [Parameter]
+    public Dictionary<string, string> GroupAssignments { get; set; } = new();
+
+    [Parameter]
+    public string? SelectedName { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> OnSelect { get; set; }
+
+    private IEnumerable<(string Name, decimal Total, string Currency)> GetGroupTotals()
+    {
+        return (Transactions ?? [])
+            .Where(t => t.Creditor?.Name is not null && !(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null))
+            .GroupBy(t => MerchantResolution.ResolveGroupName(t.Creditor!.Name!, Mappings, GroupAssignments))
+            .Select(g => (
+                Name: g.Key,
+                Total: g.Sum(t => decimal.Parse(t.TransactionAmount.Value, CultureInfo.InvariantCulture)),
+                Currency: g.First().TransactionAmount.Currency))
+            .OrderByDescending(g => g.Total);
+    }
+
+    private string GetGrandTotalText() =>
+        string.Join(" ", GetGroupTotals()
+            .GroupBy(g => g.Currency)
+            .Select(g => (Currency: g.Key, Total: g.Sum(x => x.Total)))
+            .OrderByDescending(g => g.Total)
+            .Select(g => $"{FormatCurrency(g.Currency)}{g.Total.ToString("0.00", CultureInfo.InvariantCulture)}"));
+
+    private async Task Select(string name)
+    {
+        await OnSelect.InvokeAsync(SelectedName == name ? null : name);
+    }
+
+    private static string FormatCurrency(string currency) => currency switch
+    {
+        "EUR" => "€",
+        "RUB" => "₽",
+        _ => currency
+    };
+}

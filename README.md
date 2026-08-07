@@ -1,8 +1,8 @@
-# Budget
+# SpendPulse
 
-![Budget](Budget.png)
+![SpendPulse](SpendPulse.png)
 
-A self-hosted personal budget tracker built on .NET 10 (Blazor Web App + MongoDB). It syncs transactions from your bank account via [EnableBanking](https://enablebanking.com), so it works with any bank EnableBanking supports (not just the one it was originally built against), as long as you configure it for your own bank and your own EnableBanking application.
+A self-hosted personal spending-control app built on .NET 10 (Blazor Web App + MongoDB). It syncs transactions from your bank account via [EnableBanking](https://enablebanking.com), so it works with any bank EnableBanking supports (not just the one it was originally built against), as long as you configure it for your own bank and your own EnableBanking application.
 
 ## Prerequisites
 
@@ -20,13 +20,13 @@ A self-hosted personal budget tracker built on .NET 10 (Blazor Web App + MongoDB
 
 ## 2. Configure the app
 
-Edit `Budget.Server/appsettings.json` (or override via environment variables / `appsettings.Production.json`):
+Edit `SpendPulse.Server/appsettings.json` (or override via environment variables / `appsettings.Production.json`):
 
 ```json
 {
   "MongoDb": {
     "ConnectionString": "mongodb://localhost:27017",
-    "DatabaseName": "Budget"
+    "DatabaseName": "SpendPulse"
   },
   "EnableBanking": {
     "PrivateKey": "/path/to/your/private-key.pem",
@@ -54,7 +54,7 @@ Edit `Budget.Server/appsettings.json` (or override via environment variables / `
 There's no setup UI for this — insert it once by hand via `mongosh`:
 
 ```js
-use Budget
+use SpendPulse
 db.settings.insertOne({
   bankSession: {
     accountId: "",
@@ -70,7 +70,7 @@ db.settings.insertOne({
 ## 4. Run it
 
 ```bash
-dotnet run --project Budget.Server/Budget.Server.csproj
+dotnet run --project SpendPulse.Server/SpendPulse.Server.csproj
 ```
 
 Then:

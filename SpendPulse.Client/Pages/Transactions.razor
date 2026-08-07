@@ -1,0 +1,355 @@
+@page "/"
+@rendermode InteractiveWebAssembly
+@using System.Globalization
+@using System.Text.Json
+@using SpendPulse.Client.Components
+@using SpendPulse.Client.Models
+@using SpendPulse.Client.Repositories
+@using SpendPulse.Client.Services
+@implements IDisposable
+@inject ITransactionRepository TransactionRepository
+@inject IMerchantMappingRepository MerchantMappingRepository
+@inject IMerchantGroupRepository MerchantGroupRepository
+@inject ISyncStatusRepository SyncStatusRepository
+@inject SyncStatusState SyncStatusState
+@inject IJSRuntime JS
+
+<!-- @onclick="ClearSelection" here + @onclick:stopPropagation on .page-columns
+     below is how "click outside clears the selection" works, with no JS: any
+     click that isn't stopped by something nested (a row, a sidebar item, the
+     row menu, etc.) bubbles up through Blazor's own event dispatch to here. -->
+<div @onclick="ClearSelection">
+    <div class="month-picker">
+        <button class="month-picker__nav" @onclick="PreviousMonth" aria-label="Previous month">&#8249;</button>
+        <span class="month-picker__label">@Month.ToString("MMMM yyyy")</span>
+        <button class="month-picker__nav" @onclick="NextMonth" aria-label="Next month">&#8250;</button>
+    </div>
+
+    <div class="page-columns" @onclick:stopPropagation="true">
+        <div class="page-columns__main">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Merchant</th>
+                    <th class="transactions-table__actions-header"></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in (TransactionList ?? []).Where(t => !(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null)))
+                {
+                    <tr class="@(IsHighlighted(t) ? "row--highlighted" : "")" @onclick="() => SelectTransaction(t)">
+                        <td>@t.BookingDate?.ToString("dd.MM.yyyy")</td>
+                        <td>@(t.CreditDebitIndicator == "CRDT" && t.EntryReference is not null ? "+" : "")@FormatCurrency(t.TransactionAmount.Currency)@FormatAmount(t.TransactionAmount.Value)</td>
+                        <td>@t.Creditor?.Name</td>
+                        <td class="transactions-table__actions-cell">
+                            <button class="transactions-table__action-button" @onclick="() => ToggleMenu(t)" @onclick:stopPropagation="true" aria-label="Row actions" aria-haspopup="true">
+                                <svg class="transactions-table__action-icon" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" fill="currentColor">
+                                    <circle cx="8" cy="2.5" r="1.5"/>
+                                    <circle cx="8" cy="8" r="1.5"/>
+                                    <circle cx="8" cy="13.5" r="1.5"/>
+                                </svg>
+                            </button>
+                            @if (_menuOpenFor == t)
+                            {
+                                <div class="transactions-table__menu" @onclick:stopPropagation="true">
+                                    <button class="transactions-table__menu-item" @onclick="() => OpenDetailsFromMenu(t)">Details</button>
+                                    <button class="transactions-table__menu-item" @onclick="() => OpenGroupPicker(t)" disabled="@(!_isAdmin)">Change group</button>
+                                </div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+        <div class="page-columns__sidebar">
+            <div class="page-columns__groups">
+                <GroupSummary Transactions="TransactionList" Mappings="_mappings" GroupAssignments="_groupAssignments" SelectedName="@SelectedGroup" OnSelect="SelectGroup"/>
+            </div>
+            <div class="page-columns__merchants">
+                <CreditorSummary Transactions="TransactionList" Mappings="_mappings" SelectedName="@SelectedMerchant" OnSelect="SelectMerchant"/>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (SelectedTransactionJson is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseDetails">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-box__header">
+                <span>Transaction</span>
+                <button class="modal-box__close" @onclick="CloseDetails" aria-label="Close">&times;</button>
+            </div>
+            <pre class="modal-box__json">@SelectedTransactionJson</pre>
+            <button class="modal-box__copy" @onclick="CopyToClipboard">Copy</button>
+        </div>
+    </div>
+}
+
+@if (_groupPickerTransaction is not null)
+{
+    <div class="modal-backdrop" @onclick="CloseGroupPicker">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-box__header">
+                <span>Change group</span>
+                <button class="modal-box__close" @onclick="CloseGroupPicker" aria-label="Close">&times;</button>
+            </div>
+            <div class="group-picker__merchant">@GroupPickerMerchant</div>
+            <div class="group-picker__current">Current group: <strong>@GroupPickerCurrentGroup</strong></div>
+            <ul class="group-picker__options">
+                <li class="@(GroupPickerCurrentGroup == IMerchantGroupRepository.OthersGroupName ? "group-picker__option--current" : "")" @onclick="() => PickGroup(IMerchantGroupRepository.OthersGroupName)">
+                    @IMerchantGroupRepository.OthersGroupName
+                </li>
+                @foreach (var group in _groups)
+                {
+                    <li class="@(GroupPickerCurrentGroup == group ? "group-picker__option--current" : "")" @onclick="() => PickGroup(group)">
+                        @group
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+
+    private static string FormatCurrency(string currency) => currency switch
+    {
+        "EUR" => "€",
+        "RUB" => "₽",
+        _ => currency
+    };
+
+    private static string FormatAmount(string amount) =>
+        decimal.Parse(amount, CultureInfo.InvariantCulture).ToString("0.00", CultureInfo.InvariantCulture);
+
+    [PersistentState]
+    public DateOnly Month { get; set; }
+
+    [PersistentState]
+    public List<TransactionDocument>? TransactionList { get; set; }
+
+    [PersistentState]
+    public List<MerchantMapping>? Mappings { get; set; }
+
+    [PersistentState]
+    public List<MerchantGroupAssignment>? GroupAssignments { get; set; }
+
+    [PersistentState]
+    public List<string>? GroupNames { get; set; }
+
+    [PersistentState]
+    public bool? IsAdmin { get; set; }
+
+    [PersistentState]
+    public string? SelectedMerchant { get; set; }
+
+    [PersistentState]
+    public string? SelectedGroup { get; set; }
+
+    private string? SelectedTransactionJson { get; set; }
+    private Dictionary<string, string> _mappings = new();
+    private Dictionary<string, string> _groupAssignments = new();
+    private List<string> _groups = [];
+    private bool _isAdmin;
+    private TransactionDocument? _menuOpenFor;
+    private TransactionDocument? _groupPickerTransaction;
+    private TransactionDocument? _selectedTransaction;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SyncStatusState.SyncCompleted += OnSyncCompleted;
+
+        if (TransactionList is not null)
+        {
+            _mappings = (Mappings ?? []).ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+            _groupAssignments = (GroupAssignments ?? []).ToDictionary(a => a.MerchantName, a => a.GroupName);
+            _groups = GroupNames ?? [];
+            _isAdmin = IsAdmin ?? false;
+            return;
+        }
+
+        Month = new DateOnly(DateTime.Today.Year, DateTime.Today.Month, 1);
+        Mappings = await MerchantMappingRepository.GetAll();
+        GroupAssignments = await MerchantGroupRepository.GetAssignments();
+        GroupNames = await MerchantGroupRepository.GetGroups();
+        IsAdmin = await SyncStatusRepository.IsAdmin();
+        _mappings = Mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+        _groupAssignments = GroupAssignments.ToDictionary(a => a.MerchantName, a => a.GroupName);
+        _groups = GroupNames;
+        _isAdmin = IsAdmin.Value;
+        await LoadTransactions();
+    }
+
+    private void ClearSelection()
+    {
+        SelectedMerchant = null;
+        SelectedGroup = null;
+        _menuOpenFor = null;
+        _selectedTransaction = null;
+    }
+
+    private void SelectMerchant(string? name)
+    {
+        SelectedMerchant = name;
+        SelectedGroup = null;
+        _menuOpenFor = null;
+        _selectedTransaction = null;
+    }
+
+    private void SelectGroup(string? name)
+    {
+        SelectedGroup = name;
+        SelectedMerchant = null;
+        _menuOpenFor = null;
+        _selectedTransaction = null;
+    }
+
+    private void SelectTransaction(TransactionDocument t)
+    {
+        _menuOpenFor = null;
+
+        if (_selectedTransaction == t)
+        {
+            _selectedTransaction = null;
+            SelectedMerchant = null;
+            SelectedGroup = null;
+            return;
+        }
+
+        _selectedTransaction = t;
+
+        if (t.Creditor?.Name is null)
+        {
+            SelectedMerchant = null;
+            SelectedGroup = null;
+            return;
+        }
+
+        SelectedMerchant = MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings);
+        SelectedGroup = MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments);
+    }
+
+    private bool IsHighlighted(TransactionDocument t)
+    {
+        // A row picked directly highlights only itself in the table - its group/merchant
+        // are still reflected as selected in the sidebar widgets via SelectedMerchant/Group,
+        // set above in SelectTransaction, but every other row here stays unhighlighted.
+        if (_selectedTransaction is not null)
+        {
+            return t == _selectedTransaction;
+        }
+
+        if (t.Creditor?.Name is null)
+        {
+            return false;
+        }
+
+        if (SelectedGroup is not null)
+        {
+            return MerchantResolution.ResolveGroupName(t.Creditor.Name, _mappings, _groupAssignments) == SelectedGroup;
+        }
+
+        if (SelectedMerchant is not null)
+        {
+            return MerchantResolution.ResolveCanonicalName(t.Creditor.Name, _mappings) == SelectedMerchant;
+        }
+
+        return false;
+    }
+
+    private void ToggleMenu(TransactionDocument t)
+    {
+        _menuOpenFor = _menuOpenFor == t ? null : t;
+    }
+
+    private void OpenDetailsFromMenu(TransactionDocument t)
+    {
+        _menuOpenFor = null;
+        ShowDetails(t);
+    }
+
+    private void OpenGroupPicker(TransactionDocument t)
+    {
+        _menuOpenFor = null;
+        _groupPickerTransaction = t;
+    }
+
+    private void CloseGroupPicker()
+    {
+        _groupPickerTransaction = null;
+    }
+
+    private string? GroupPickerMerchant =>
+        _groupPickerTransaction?.Creditor?.Name is { } name ? MerchantResolution.ResolveCanonicalName(name, _mappings) : null;
+
+    private string? GroupPickerCurrentGroup =>
+        _groupPickerTransaction?.Creditor?.Name is { } name ? MerchantResolution.ResolveGroupName(name, _mappings, _groupAssignments) : null;
+
+    private async Task PickGroup(string groupName)
+    {
+        if (GroupPickerMerchant is not { } merchant)
+        {
+            return;
+        }
+
+        await MerchantGroupRepository.SetAssignment(merchant, groupName);
+        _groupAssignments[merchant] = groupName;
+        _groupPickerTransaction = null;
+    }
+
+    private void OnSyncCompleted()
+    {
+        _ = InvokeAsync(async () =>
+        {
+            await LoadTransactions();
+            StateHasChanged();
+        });
+    }
+
+    public void Dispose()
+    {
+        SyncStatusState.SyncCompleted -= OnSyncCompleted;
+    }
+
+    private async Task PreviousMonth()
+    {
+        Month = Month.AddMonths(-1);
+        await LoadTransactions();
+    }
+
+    private async Task NextMonth()
+    {
+        Month = Month.AddMonths(1);
+        await LoadTransactions();
+    }
+
+    private async Task LoadTransactions()
+    {
+        var to = Month.AddMonths(1).AddDays(-1);
+        TransactionList = await TransactionRepository.Get(Month, to);
+    }
+
+    private void ShowDetails(TransactionDocument transaction)
+    {
+        SelectedTransactionJson = JsonSerializer.Serialize(transaction, JsonOptions);
+    }
+
+    private void CloseDetails()
+    {
+        SelectedTransactionJson = null;
+    }
+
+    private async Task CopyToClipboard()
+    {
+        if (SelectedTransactionJson is not null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", SelectedTransactionJson);
+        }
+    }
+}

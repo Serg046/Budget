@@ -1,0 +1,613 @@
+@page "/trends"
+@rendermode InteractiveWebAssembly
+@using System.Globalization
+@using System.Net
+@using System.Text
+@using SpendPulse.Client.Models
+@using SpendPulse.Client.Repositories
+@using SpendPulse.Client.Services
+@inject ITransactionRepository TransactionRepository
+@inject IMerchantMappingRepository MerchantMappingRepository
+@inject IMerchantGroupRepository MerchantGroupRepository
+@inject ITrendMonthExclusionRepository TrendMonthExclusionRepository
+@inject ISyncStatusRepository SyncStatusRepository
+
+<div class="trends-toolbar">
+    <div class="trends-toolbar__range">
+        <input type="month" class="trends-toolbar__month-input" value="@_fromMonth.ToString("yyyy-MM")" max="@_maxMonth.ToString("yyyy-MM")" @onchange="OnFromChanged"/>
+        <span class="trends-toolbar__range-sep">to</span>
+        <input type="month" class="trends-toolbar__month-input" value="@_toMonth.ToString("yyyy-MM")" max="@_maxMonth.ToString("yyyy-MM")" @onchange="OnToChanged"/>
+    </div>
+
+    <div class="trends-toolbar__mode">
+        <button class="trends-toolbar__mode-btn @(_mode == ViewMode.Group ? "trends-toolbar__mode-btn--active" : "")" @onclick="() => SetMode(ViewMode.Group)">By Group</button>
+        <button class="trends-toolbar__mode-btn @(_mode == ViewMode.Merchant ? "trends-toolbar__mode-btn--active" : "")" @onclick="() => SetMode(ViewMode.Merchant)">By Merchant</button>
+    </div>
+
+    @if (_mode == ViewMode.Merchant)
+    {
+        <div class="trends-toolbar__merchant-picker">
+            <input list="trends-merchant-options" class="trends-toolbar__merchant-input" placeholder="Add merchant..."
+                   value="@_merchantPickerValue" @oninput="e => _merchantPickerValue = (string?)e.Value ?? string.Empty"
+                   @onkeydown="OnMerchantPickerKeyDown"/>
+            <datalist id="trends-merchant-options">
+                @foreach (var name in _allMerchantNames)
+                {
+                    <option value="@name"></option>
+                }
+            </datalist>
+            <button class="trends-toolbar__merchant-add" @onclick="() => AddMerchant(_merchantPickerValue)">Add</button>
+        </div>
+    }
+
+    <button class="trends-toolbar__button" @onclick="OpenExclusionsModal">Excluded months (@_excludedMonths.Count)</button>
+
+    <button class="trends-toolbar__table-toggle" @onclick="() => _showTable = !_showTable">@(_showTable ? "Show chart" : "Show table")</button>
+</div>
+
+@if (_showExclusionsModal)
+{
+    <div class="modal-backdrop" @onclick="CloseExclusionsModal">
+        <div class="modal-box" @onclick:stopPropagation="true">
+            <div class="modal-box__header">
+                <span>Excluded months</span>
+                <button class="modal-box__close" @onclick="CloseExclusionsModal" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="trends-exclusions__chips">
+                @foreach (var month in _excludedMonths.OrderBy(m => m))
+                {
+                    <span class="trends-exclusions__chip">
+                        @month.ToString("MMM yyyy")
+                        @if (_isAdmin)
+                        {
+                            <button class="trends-exclusions__remove" @onclick="() => RemoveExclusion(month)" aria-label="Remove @month.ToString("MMM yyyy")">&times;</button>
+                        }
+                    </span>
+                }
+                @if (_excludedMonths.Count == 0)
+                {
+                    <span class="trends-exclusions__empty">No months excluded.</span>
+                }
+            </div>
+
+            @if (_isAdmin)
+            {
+                <div class="trends-exclusions__add-row">
+                    <input type="month" class="trends-exclusions__input" value="@_newExclusionMonth" @onchange="e => _newExclusionMonth = (string?)e.Value ?? string.Empty"/>
+                    <button class="trends-exclusions__add" @onclick="AddExclusion">Add</button>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@if (_loading)
+{
+    <p class="trends-loading">Loading...</p>
+}
+else if (_showTable)
+{
+    <div class="trends-table-wrap">
+        <table class="trends-table">
+            <thead>
+                <tr>
+                    <th>Month</th>
+                    @foreach (var series in _seriesNames)
+                    {
+                        <th>@series</th>
+                    }
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var month in _months)
+                {
+                    <tr>
+                        <td>@month.ToString("MMM yyyy")</td>
+                        @foreach (var series in _seriesNames)
+                        {
+                            <td>€@GetValue(month, series).ToString("0.00", CultureInfo.InvariantCulture)</td>
+                        }
+                        <td class="trends-table__total">€@GetMonthTotal(month).ToString("0.00", CultureInfo.InvariantCulture)</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else
+{
+    <div class="trends-chart viz-root">
+        <div class="trends-chart__plot">
+            <svg viewBox="0 0 @Fmt(ChartWidth) @Fmt(ChartHeight)" class="trends-chart__svg" preserveAspectRatio="xMidYMid meet">
+                @foreach (var tick in GetYTicks())
+                {
+                    <line class="trends-chart__gridline" x1="@Fmt(MarginLeft)" x2="@Fmt(ChartWidth - MarginRight)" y1="@Fmt(tick.Y)" y2="@Fmt(tick.Y)"/>
+                }
+                @RenderYAxisLabels()
+
+                <line class="trends-chart__baseline" x1="@Fmt(MarginLeft)" x2="@Fmt(ChartWidth - MarginRight)" y1="@Fmt(MarginTop + PlotHeight)" y2="@Fmt(MarginTop + PlotHeight)"/>
+
+                @RenderXAxisLabels()
+
+                @foreach (var series in GetRenderOrder())
+                {
+                    <polyline class="trends-chart__line @(_selectedSeries == series ? "trends-chart__line--selected" : "")"
+                              points="@GetPolylinePoints(series)"
+                              stroke="@GetRenderColor(series)"
+                              @onclick="() => ToggleSelect(series)"/>
+
+                    @foreach (var point in _seriesPoints[series])
+                    {
+                        <circle class="trends-chart__marker" cx="@Fmt(point.X)" cy="@Fmt(point.Y)" r="4"
+                                fill="@GetRenderColor(series)"
+                                @onmouseenter="() => SetHover(point.Month, series, point.Value, point.X, point.Y)"
+                                @onmouseleave="ClearHover"
+                                @onclick="() => ToggleSelect(series)"/>
+                    }
+                }
+            </svg>
+
+            @if (_hover is not null)
+            {
+                <div class="trends-chart__tooltip" style="left: @((_hover.Value.X / ChartWidth * 100).ToString(CultureInfo.InvariantCulture))%; top: @((_hover.Value.Y / ChartHeight * 100).ToString(CultureInfo.InvariantCulture))%;">
+                    <strong>€@_hover.Value.Value.ToString("0.00", CultureInfo.InvariantCulture)</strong>
+                    <div>@_hover.Value.Series &middot; @_hover.Value.Month.ToString("MMM yyyy")</div>
+                </div>
+            }
+        </div>
+
+        <div class="trends-chart__legend">
+            @foreach (var series in _seriesNames)
+            {
+                <div class="trends-chart__legend-item @(_selectedSeries == series ? "trends-chart__legend-item--selected" : "")" @onclick="() => ToggleSelect(series)">
+                    <span class="trends-chart__legend-swatch" style="background-color: @GetRenderColor(series)"></span>
+                    <span>@series</span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private enum ViewMode { Group, Merchant }
+
+    private const int TopMerchantCount = 10;
+    private const string DeemphasisColor = "#d6d5d5";
+    private const double ChartWidth = 760;
+    private const double ChartHeight = 320;
+    private const double MarginLeft = 56;
+    private const double MarginRight = 10;
+    private const double MarginTop = 10;
+    private const double MarginBottom = 34;
+    private static readonly string[] Palette =
+    [
+        "#2a78d6", "#1baf7a", "#eda100", "#008300", "#4a3aa7", "#e34948", "#e87ba4", "#eb6834"
+    ];
+
+    private static double PlotWidth => ChartWidth - MarginLeft - MarginRight;
+    private static double PlotHeight => ChartHeight - MarginTop - MarginBottom;
+
+    [PersistentState]
+    public DateOnly? FromMonth { get; set; }
+
+    [PersistentState]
+    public DateOnly? ToMonth { get; set; }
+
+    [PersistentState]
+    public List<MonthlySpend>? GroupModeSpends { get; set; }
+
+    [PersistentState]
+    public List<MonthlySpend>? MerchantModeSpends { get; set; }
+
+    [PersistentState]
+    public List<string>? AllMerchantNames { get; set; }
+
+    [PersistentState]
+    public List<MerchantMapping>? Mappings { get; set; }
+
+    [PersistentState]
+    public List<MerchantGroupAssignment>? GroupAssignments { get; set; }
+
+    [PersistentState]
+    public List<DateOnly>? MonthExclusions { get; set; }
+
+    [PersistentState]
+    public bool? IsAdmin { get; set; }
+
+    private DateOnly _fromMonth;
+    private DateOnly _toMonth;
+    private DateOnly _maxMonth;
+    private ViewMode _mode = ViewMode.Group;
+    private bool _showTable;
+    private bool _loading = true;
+    private bool _isAdmin;
+    private bool _showExclusionsModal;
+    private string _newExclusionMonth = string.Empty;
+    private List<DateOnly> _excludedMonths = [];
+    private List<string> _allMerchantNames = [];
+    private List<MonthlySpend> _extraMerchantSpends = [];
+    private HashSet<string> _extraMerchantNames = [];
+    private string _merchantPickerValue = string.Empty;
+    private Dictionary<string, string> _mappings = new();
+    private Dictionary<string, string> _groupAssignments = new();
+    private List<DateOnly> _months = [];
+    private List<string> _seriesNames = [];
+    private Dictionary<string, string> _seriesColors = new();
+    private Dictionary<(DateOnly Month, string Series), decimal> _values = new();
+    private List<(DateOnly Month, double X)> _monthPositions = [];
+    private Dictionary<string, List<(double X, double Y, decimal Value, DateOnly Month)>> _seriesPoints = new();
+    private decimal _niceMax = 100;
+    private string? _selectedSeries;
+    private (DateOnly Month, string Series, decimal Value, double X, double Y)? _hover;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        _maxMonth = new DateOnly(today.Year, today.Month, 1).AddMonths(-1);
+
+        if (FromMonth is not null && ToMonth is not null)
+        {
+            _fromMonth = FromMonth.Value;
+            _toMonth = ToMonth.Value > _maxMonth ? _maxMonth : ToMonth.Value;
+            _mappings = (Mappings ?? []).ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+            _groupAssignments = (GroupAssignments ?? []).ToDictionary(a => a.MerchantName, a => a.GroupName);
+            _excludedMonths = MonthExclusions ?? [];
+            _isAdmin = IsAdmin ?? false;
+            _allMerchantNames = AllMerchantNames ?? [];
+            await EnsureModeDataLoaded();
+            Recompute();
+            _loading = false;
+            return;
+        }
+
+        _toMonth = _maxMonth;
+        var defaultFromMonth = _toMonth.AddMonths(-11);
+
+        var earliestBookingDate = await TransactionRepository.GetEarliestBookingDate();
+        var earliestMonth = earliestBookingDate is null
+            ? defaultFromMonth
+            : new DateOnly(earliestBookingDate.Value.Year, earliestBookingDate.Value.Month, 1);
+
+        _fromMonth = earliestMonth > defaultFromMonth ? earliestMonth : defaultFromMonth;
+        FromMonth = _fromMonth;
+        ToMonth = _toMonth;
+
+        Mappings = await MerchantMappingRepository.GetAll();
+        GroupAssignments = await MerchantGroupRepository.GetAssignments();
+        MonthExclusions = await TrendMonthExclusionRepository.GetAll();
+        IsAdmin = await SyncStatusRepository.IsAdmin();
+        AllMerchantNames = await TransactionRepository.GetDistinctMerchantNames();
+        _mappings = Mappings.ToDictionary(m => m.MappedFrom, m => m.MappedTo);
+        _groupAssignments = GroupAssignments.ToDictionary(a => a.MerchantName, a => a.GroupName);
+        _excludedMonths = MonthExclusions;
+        _isAdmin = IsAdmin.Value;
+        _allMerchantNames = AllMerchantNames;
+
+        await LoadSpend();
+    }
+
+    private void OpenExclusionsModal()
+    {
+        _showExclusionsModal = true;
+    }
+
+    private void CloseExclusionsModal()
+    {
+        _showExclusionsModal = false;
+        _newExclusionMonth = string.Empty;
+    }
+
+    private async Task AddExclusion()
+    {
+        if (!_isAdmin || !DateOnly.TryParseExact(_newExclusionMonth, "yyyy-MM", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        {
+            return;
+        }
+
+        var month = new DateOnly(parsed.Year, parsed.Month, 1);
+        if (_excludedMonths.Contains(month))
+        {
+            return;
+        }
+
+        await TrendMonthExclusionRepository.Add(month);
+        _excludedMonths.Add(month);
+        _newExclusionMonth = string.Empty;
+        Recompute();
+    }
+
+    private async Task RemoveExclusion(DateOnly month)
+    {
+        if (!_isAdmin)
+        {
+            return;
+        }
+
+        await TrendMonthExclusionRepository.Remove(month);
+        _excludedMonths.Remove(month);
+        Recompute();
+    }
+
+    private async Task LoadSpend()
+    {
+        _loading = true;
+        GroupModeSpends = null;
+        MerchantModeSpends = null;
+        _extraMerchantSpends = [];
+        _extraMerchantNames = [];
+        await EnsureModeDataLoaded();
+        Recompute();
+        _loading = false;
+    }
+
+    private async Task EnsureModeDataLoaded()
+    {
+        var to = _toMonth.AddMonths(1).AddDays(-1);
+        if (_mode == ViewMode.Group && GroupModeSpends is null)
+        {
+            GroupModeSpends = await TransactionRepository.GetMonthlySpendByMerchant(_fromMonth, to);
+        }
+        else if (_mode == ViewMode.Merchant && MerchantModeSpends is null)
+        {
+            MerchantModeSpends = await TransactionRepository.GetTopMerchantsMonthlySpend(_fromMonth, to, TopMerchantCount);
+        }
+    }
+
+    private async Task AddMerchant(string rawName)
+    {
+        if (string.IsNullOrWhiteSpace(rawName))
+        {
+            return;
+        }
+
+        var canonical = MerchantResolution.ResolveCanonicalName(rawName, _mappings);
+        if (_seriesNames.Contains(canonical) || _extraMerchantNames.Contains(rawName))
+        {
+            _merchantPickerValue = string.Empty;
+            return;
+        }
+
+        var to = _toMonth.AddMonths(1).AddDays(-1);
+        var spend = await TransactionRepository.GetMonthlySpendForMerchant(_fromMonth, to, rawName);
+        _extraMerchantSpends.AddRange(spend);
+        _extraMerchantNames.Add(rawName);
+        _merchantPickerValue = string.Empty;
+        Recompute();
+    }
+
+    private async Task OnMerchantPickerKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await AddMerchant(_merchantPickerValue);
+        }
+    }
+
+    private async Task OnFromChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParseExact((string?)e.Value, "yyyy-MM", CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed))
+        {
+            var month = new DateOnly(parsed.Year, parsed.Month, 1);
+            _fromMonth = month > _maxMonth ? _maxMonth : month;
+            FromMonth = _fromMonth;
+            await LoadSpend();
+        }
+    }
+
+    private async Task OnToChanged(ChangeEventArgs e)
+    {
+        if (DateOnly.TryParseExact((string?)e.Value, "yyyy-MM", CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed))
+        {
+            var month = new DateOnly(parsed.Year, parsed.Month, 1);
+            _toMonth = month > _maxMonth ? _maxMonth : month;
+            ToMonth = _toMonth;
+            await LoadSpend();
+        }
+    }
+
+    private async Task SetMode(ViewMode mode)
+    {
+        if (_mode == mode)
+        {
+            return;
+        }
+
+        _mode = mode;
+        _selectedSeries = null;
+        _loading = true;
+        await EnsureModeDataLoaded();
+        Recompute();
+        _loading = false;
+    }
+
+    private void ToggleSelect(string series)
+    {
+        _selectedSeries = _selectedSeries == series ? null : series;
+    }
+
+    private IEnumerable<string> GetRenderOrder()
+    {
+        return _selectedSeries is null
+            ? _seriesNames
+            : _seriesNames.Where(s => s != _selectedSeries).Concat(_seriesNames.Where(s => s == _selectedSeries));
+    }
+
+    private string GetRenderColor(string series)
+    {
+        if (_selectedSeries is null || series == _selectedSeries)
+        {
+            return _seriesColors[series];
+        }
+
+        return DeemphasisColor;
+    }
+
+    private static string Fmt(double value) => value.ToString(CultureInfo.InvariantCulture);
+
+    private const string AxisLabelStyle = "font-size:10px;fill:#898781;";
+    private const string AxisYearLabelStyle = "font-size:10px;fill:#52514e;";
+
+    private MarkupString RenderYAxisLabels()
+    {
+        var sb = new StringBuilder();
+        foreach (var tick in GetYTicks())
+        {
+            sb.Append($"""<text class="trends-chart__axis-label" style="{AxisLabelStyle}" x="{Fmt(MarginLeft - 8)}" y="{Fmt(tick.Y + 4)}" text-anchor="end">{WebUtility.HtmlEncode(tick.Label)}</text>""");
+        }
+
+        return new MarkupString(sb.ToString());
+    }
+
+    private MarkupString RenderXAxisLabels()
+    {
+        var sb = new StringBuilder();
+        foreach (var pos in _monthPositions)
+        {
+            var x = Fmt(pos.X);
+            sb.Append($"""<text class="trends-chart__axis-label" style="{AxisLabelStyle}" x="{x}" y="{Fmt(MarginTop + PlotHeight + 18)}" text-anchor="middle">{WebUtility.HtmlEncode(pos.Month.ToString("MMM"))}</text>""");
+            sb.Append($"""<text class="trends-chart__axis-label trends-chart__axis-label--year" style="{AxisYearLabelStyle}" x="{x}" y="{Fmt(MarginTop + PlotHeight + 30)}" text-anchor="middle">{WebUtility.HtmlEncode(pos.Month.ToString("yyyy"))}</text>""");
+        }
+
+        return new MarkupString(sb.ToString());
+    }
+
+    private string GetPolylinePoints(string series) =>
+        string.Join(" ", _seriesPoints[series].Select(p => $"{Fmt(p.X)},{Fmt(p.Y)}"));
+
+    private void SetHover(DateOnly month, string series, decimal value, double x, double y)
+    {
+        _hover = (month, series, value, x, y);
+    }
+
+    private void ClearHover()
+    {
+        _hover = null;
+    }
+
+    private decimal GetValue(DateOnly month, string series) => _values.GetValueOrDefault((month, series));
+
+    private decimal GetMonthTotal(DateOnly month) => _seriesNames.Sum(s => GetValue(month, s));
+
+    private void Recompute()
+    {
+        _months = [];
+        for (var m = _fromMonth; m <= _toMonth; m = m.AddMonths(1))
+        {
+            if (!_excludedMonths.Contains(m))
+            {
+                _months.Add(m);
+            }
+        }
+
+        var raw = (_mode == ViewMode.Group
+                ? (GroupModeSpends ?? [])
+                : (MerchantModeSpends ?? []).Concat(_extraMerchantSpends))
+            .Where(r => !_excludedMonths.Contains(r.Month));
+
+        var perSeriesMonth = new Dictionary<(DateOnly, string), decimal>();
+        var totalsBySeries = new Dictionary<string, decimal>();
+
+        foreach (var record in raw)
+        {
+            var seriesName = _mode == ViewMode.Group
+                ? MerchantResolution.ResolveGroupName(record.MerchantName, _mappings, _groupAssignments)
+                : MerchantResolution.ResolveCanonicalName(record.MerchantName, _mappings);
+
+            var key = (record.Month, seriesName);
+            perSeriesMonth[key] = perSeriesMonth.GetValueOrDefault(key) + record.Total;
+            totalsBySeries[seriesName] = totalsBySeries.GetValueOrDefault(seriesName) + record.Total;
+        }
+
+        var orderedSeries = totalsBySeries.OrderByDescending(kv => kv.Value).ToList();
+        var finalSeries = orderedSeries.Select(kv => kv.Key).ToList();
+
+        if (_selectedSeries is not null && !finalSeries.Contains(_selectedSeries))
+        {
+            _selectedSeries = null;
+        }
+
+        _seriesNames = finalSeries;
+        _values = perSeriesMonth;
+
+        _seriesColors = new Dictionary<string, string>();
+        var colorIndex = 0;
+        foreach (var name in _seriesNames)
+        {
+            _seriesColors[name] = Palette[colorIndex++ % Palette.Length];
+        }
+
+        BuildChart();
+    }
+
+    private static decimal NiceMax(decimal value)
+    {
+        if (value <= 0)
+        {
+            return 100;
+        }
+
+        var magnitude = (decimal)Math.Pow(10, Math.Floor(Math.Log10((double)value)));
+        var normalized = value / magnitude;
+        var niceNormalized = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+        return niceNormalized * magnitude;
+    }
+
+    private void BuildChart()
+    {
+        var maxValue = 0m;
+        foreach (var month in _months)
+        {
+            foreach (var series in _seriesNames)
+            {
+                var v = GetValue(month, series);
+                if (v > maxValue)
+                {
+                    maxValue = v;
+                }
+            }
+        }
+
+        _niceMax = NiceMax(maxValue);
+
+        _monthPositions = [];
+        for (var i = 0; i < _months.Count; i++)
+        {
+            var x = _months.Count <= 1 ? MarginLeft + PlotWidth / 2 : MarginLeft + i * (PlotWidth / (_months.Count - 1));
+            _monthPositions.Add((_months[i], x));
+        }
+
+        _seriesPoints = new Dictionary<string, List<(double, double, decimal, DateOnly)>>();
+
+        foreach (var series in _seriesNames)
+        {
+            var points = new List<(double, double, decimal, DateOnly)>();
+
+            for (var i = 0; i < _months.Count; i++)
+            {
+                var month = _months[i];
+                var value = GetValue(month, series);
+                var x = _monthPositions[i].X;
+                var y = _niceMax <= 0 ? MarginTop + PlotHeight : MarginTop + PlotHeight - (double)(value / _niceMax) * PlotHeight;
+                points.Add((x, y, value, month));
+            }
+
+            _seriesPoints[series] = points;
+        }
+    }
+
+    private List<(double Y, string Label)> GetYTicks()
+    {
+        var ticks = new List<(double, string)>();
+        for (var i = 0; i <= 8; i++)
+        {
+            var fraction = i / 8.0;
+            var value = _niceMax * (decimal)fraction;
+            var y = MarginTop + PlotHeight - fraction * PlotHeight;
+            ticks.Add((y, "€" + value.ToString("0", CultureInfo.InvariantCulture)));
+        }
+
+        return ticks;
+    }
+}

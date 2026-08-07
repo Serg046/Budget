@@ -1,10 +1,10 @@
-project: budget-app
+project: spendpulse
 configVersion: 1
 build:
   platform:
   - linux/amd64
 ---
-image: app
+image: spendpulse
 dockerfile: Dockerfile
 secrets:
 - env: ENABLEBANKING_PRIVATE_KEY

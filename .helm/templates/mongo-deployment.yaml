@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: budget-mongo-deployment
+  name: mongo-deployment
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: budget-mongo-deployment
+      app: mongo-deployment
   template:
     metadata:
       labels:
-        app: budget-mongo-deployment
+        app: mongo-deployment
     spec:
       containers:
       - name: mongo
@@ -25,4 +25,4 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: budget-mongo-pvc
+          claimName: mongo-pvc

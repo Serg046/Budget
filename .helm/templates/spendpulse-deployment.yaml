@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spendpulse-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: spendpulse
+  template:
+    metadata:
+      labels:
+        app: spendpulse
+    spec:
+      imagePullSecrets:
+      - name: registrysecret
+      containers:
+      - name: app
+        image: {{ .Values.werf.image.spendpulse }}
+        ports:
+        - containerPort: 8080
