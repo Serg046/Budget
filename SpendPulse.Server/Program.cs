@@ -23,6 +23,8 @@ CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Services.AddHttpLogging(_ => { });
+
 builder.Services.AddRazorComponents()
     .AddInteractiveWebAssemblyComponents();
 builder.Services.AddSingleton<IMongoClient>(_ =>
@@ -84,6 +86,8 @@ else
 }
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+
+app.UseHttpLogging();
 
 app.UseAuthentication();
 app.UseAuthorization();
