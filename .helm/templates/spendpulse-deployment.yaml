@@ -19,3 +19,12 @@ spec:
         image: {{ .Values.werf.image.spendpulse }}
         ports:
         - containerPort: 8080
+        volumeMounts:
+        - name: enablebanking-key
+          mountPath: /etc/keys
+          readOnly: true
+      volumes:
+      - name: enablebanking-key
+        hostPath:
+          path: /etc/keys
+          type: Directory

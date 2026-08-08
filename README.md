@@ -82,3 +82,5 @@ Then:
 ## Deploying
 
 A `Dockerfile`, `werf.yaml`, and Helm charts under `.helm/` are included, but they reflect the author's own opinionated Kubernetes/werf deployment pipeline (tied to his own cluster and CI secrets) rather than a turnkey setup for everyone. For your own deployment, it's simplest to build the provided `Dockerfile` yourself and supply your own `MongoDb`, `EnableBanking`, and `Auth` configuration directly (via `appsettings.json` or environment variables), rather than relying on the CI-specific secret-injection step in that Dockerfile.
+
+If you do use the Helm chart as-is: the app Deployment mounts `/etc/keys` from the **k8s node's own filesystem** (a `hostPath` volume) into the container at the same path, since `EnableBanking:PrivateKey` is a file path, not raw key content baked into config. Before deploying, place your private key file at `/etc/keys/` on the node itself (this only works cleanly on a single-node cluster — a `hostPath` volume ties the pod to whichever specific node has the file). Forgetting this step fails with `DirectoryNotFoundException: Could not find a part of the path '/etc/keys/...'` the moment bank sync runs.
